@@ -6,6 +6,7 @@ module Crypto.Types
     PrivateKeyScheme(..)
     -- * Text types
   , Alpha(..)
+  , AlphaString(..)
   ) where
 
 import Control.Monad.Random
