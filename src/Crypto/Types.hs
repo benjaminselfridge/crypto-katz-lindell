@@ -1,6 +1,9 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeFamilies #-}
 
+-- | Types used in this library to express the various encryption schemes and
+-- attacks found in Katz/Lindell.
+
 module Crypto.Types
   ( -- * Private key encryption schemes
     PrivateKeyScheme(..)

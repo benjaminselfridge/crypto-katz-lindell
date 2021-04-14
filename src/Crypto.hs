@@ -1,3 +1,5 @@
+-- | Top-level module for everything in this library.
+
 module Crypto
   ( module Crypto.Types
   , module Crypto.Schemes
