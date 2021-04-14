@@ -76,10 +76,10 @@ listScheme s = PrivateKeyScheme
 -- in the @plaintext@ list. When we run out of @key@ values, we start over with
 -- the original list.
 --
--- The security parameter of the resulting scheme will be equivalent to the
--- length of the key produced by the 'generateKey' function. The 'Int' that is
--- passed to this function will be used as the security parameter that gets fed
--- to the 'generateKey' of the input scheme.
+-- The security parameter of the resulting scheme will determine the length of
+-- the key produced by the 'generateKey' function. The 'Int' that is passed to
+-- this function will be used as the security parameter that gets fed to the
+-- 'generateKey' of the input scheme.
 --
 -- If the key length is non-positive, the key generation will throw a runtime
 -- error.
