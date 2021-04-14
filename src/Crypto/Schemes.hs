@@ -98,7 +98,7 @@ cycleKeyScheme s securityParam = PrivateKeyScheme
   , decrypt = zipWith (decrypt s) . cycle . toList
   }
 
-  where msg = "cycleKeyScheme called with non-positive key length"
+  where msg = "generateKey called with non-positive key length"
 
 -- | Shift cipher for single 'Alpha'. This is used to define 'shiftCipher' and
 -- 'vigenereCipher'. The key generator ignores its input.
