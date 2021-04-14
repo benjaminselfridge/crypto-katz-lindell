@@ -22,8 +22,10 @@ maintainer:         benselfridge@galois.com
 extra-source-files: CHANGELOG.md
 
 library
-    exposed-modules:  Crypto.Types
+    exposed-modules:  Crypto
+                      Crypto.Types
                       Crypto.Schemes
+                      Crypto.Attacks
 
     -- Modules included in this library but not exported.
     -- other-modules:
