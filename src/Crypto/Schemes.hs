@@ -122,7 +122,7 @@ shiftCipher = listScheme shiftCipher'
 -- of keys.
 --
 -- @
--- vigenerCipher = cycleKeyScheme shiftCipher' undefined
+-- vigenereCipher = cycleKeyScheme shiftCipher' undefined
 -- @
 vigenereCipher :: PrivateKeyScheme (LN.NonEmpty Int) [Alpha] [Alpha]
 vigenereCipher = cycleKeyScheme shiftCipher' undefined
