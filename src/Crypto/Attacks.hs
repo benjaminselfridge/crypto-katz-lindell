@@ -5,7 +5,7 @@ module Crypto.Attacks
   ( bruteForce
   ) where
 
-import Crypto.Types
+import Crypto.Schemes
 
 -- | A brute-force attack can be applied on any encryption scheme for which we
 -- can enumerate keys. Given a ciphertext to decrypt, the scheme @s@ it was
