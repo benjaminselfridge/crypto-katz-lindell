@@ -3,20 +3,21 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
 
--- | A library of encryption schemes found in Katz/Lindell.
+-- | Types for, and examples of, encryption schemes found in Katz/Lindell.
 module Crypto.Schemes
   ( -- * Private key encryption schemes
     PrivateKeyScheme(..)
   , generateKey1
+    -- * New schemes from old
+  , listScheme
+  , cycleKeyScheme
+    -- * Example private key ciphers
   , shiftCipher'
   , shiftCipher
   , substCipher'
   , substCipher
   , vigenereCipher
   , oneTimePad
-    -- * New schemes from old
-  , listScheme
-  , cycleKeyScheme
   ) where
 
 import Crypto.Types
