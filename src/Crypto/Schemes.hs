@@ -148,4 +148,3 @@ oneTimePad w = PrivateKeyScheme
   , encrypt = \k -> return . BV.xor k
   , decrypt = BV.xor
   }
- 
