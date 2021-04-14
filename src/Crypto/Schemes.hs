@@ -28,8 +28,6 @@ import qualified Data.BitVector.Sized as BV
 import Data.Foldable (toList)
 import qualified Data.List.NonEmpty as LN
 import Data.Maybe (fromJust)
-import Data.MonoTraversable
-import qualified Data.Sequences as S
 import Math.Combinat.Permutations
 
 -- | Private key scheme, as defined in Katz/Lindell page 4.
