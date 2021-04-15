@@ -29,10 +29,11 @@ import qualified Data.List.NonEmpty as LN
 import Data.Maybe (fromJust)
 import Math.Combinat.Permutations
 
--- | Private key scheme, as defined in Katz/Lindell page 4.
+-- | Private key scheme, as defined in Katz/Lindell page 60 (Definition 3.7),
+-- but with generalized keys, plaintext, and ciphertext types.
 --
--- Note that, given a scheme @s@, and for all keys @k@ and messages @p@, we must
--- have
+-- Note that, for scheme @s@ to be valid, we require that for all keys @k@ and
+-- messages @p@:
 --
 -- @
 --   decrypt s k (encrypt s k m) == m
