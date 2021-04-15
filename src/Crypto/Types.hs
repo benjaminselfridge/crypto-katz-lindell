@@ -12,7 +12,7 @@ module Crypto.Types
   ) where
 
 import Data.Char (toUpper)
-import Data.Maybe (catMaybes)
+import Data.Maybe (mapMaybe)
 
 -- | Alphabetical character, for schemes that only use letters.
 data Alpha = A | B | C | D | E | F | G | H
@@ -84,4 +84,4 @@ alphaToChar Z = 'Z'
 -- | Converts a string to a list of 'Alpha's by mapping the characters to
 -- uppercase and removing characters that are not alphabetical.
 alphaFromString :: String -> [Alpha]
-alphaFromString = catMaybes . map (alphaFromChar . toUpper)
+alphaFromString = mapMaybe (alphaFromChar . toUpper)
