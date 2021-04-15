@@ -128,7 +128,7 @@ vigenereCipher = cycleKeyScheme shiftCipher' undefined
 -- 'substCipher'. The key generator ignores its input.
 substCipher' :: PrivateKeyScheme Permutation Alpha Alpha
 substCipher' = PrivateKeyScheme
-  { generateKey = const $ (fst . randomPermutation 26 . mkStdGen) <$> getRandom
+  { generateKey = const $ fst . randomPermutation 26 . mkStdGen <$> getRandom
   , encrypt = \key -> return . fromJust . flip lookup (zip [A .. Z] (permuteList key [A .. Z]))
   , decrypt = \key -> fromJust . flip lookup (zip (permuteList key [A .. Z]) [A .. Z])
   }
