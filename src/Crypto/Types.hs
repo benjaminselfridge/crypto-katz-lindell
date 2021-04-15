@@ -7,7 +7,7 @@ module Crypto.Types
   ( -- * Text types
     Alpha(..)
   , alphaFromChar
-  , alphaFromString
+  , alphasFromString
   , alphaToChar
   ) where
 
@@ -83,5 +83,5 @@ alphaToChar Z = 'Z'
 
 -- | Converts a string to a list of 'Alpha's by mapping the characters to
 -- uppercase and removing characters that are not alphabetical.
-alphaFromString :: String -> [Alpha]
-alphaFromString = mapMaybe (alphaFromChar . toUpper)
+alphasFromString :: String -> [Alpha]
+alphasFromString = mapMaybe (alphaFromChar . toUpper)
