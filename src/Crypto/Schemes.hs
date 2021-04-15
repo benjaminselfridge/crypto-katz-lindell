@@ -53,9 +53,6 @@ generateKey1 :: forall key plaintext ciphertext m . MonadRandom m
              => PrivateKeyScheme key plaintext ciphertext -> m key
 generateKey1 = flip generateKey 1
 
-shiftAlpha :: Int -> Alpha -> Alpha
-shiftAlpha i = toEnum . (`mod` 26) . (+i) . fromEnum
-
 -- | Lift a 'PrivateKeyScheme' to operate on lists of the @plaintext@ and
 -- @ciphertext@ types. The @key@ type doesn't change; we simply apply the same
 -- key to each element of the lists. The resulting scheme is by definition
@@ -97,6 +94,9 @@ cycleKeyScheme s securityParam = PrivateKeyScheme
   }
 
   where msg = "generateKey called with non-positive key length"
+
+shiftAlpha :: Int -> Alpha -> Alpha
+shiftAlpha i = toEnum . (`mod` 26) . (+i) . fromEnum
 
 -- | Shift cipher for single 'Alpha'. This is used to define 'shiftCipher' and
 -- 'vigenereCipher'. The key generator ignores its input.
