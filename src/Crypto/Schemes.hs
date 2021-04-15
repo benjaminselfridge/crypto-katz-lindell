@@ -143,6 +143,6 @@ substCipher = listScheme substCipher'
 oneTimePad :: BV.NatRepr w -> PrivateKeyScheme (BV.BV w) (BV.BV w) (BV.BV w)
 oneTimePad w = PrivateKeyScheme
   { generateKey = const $ BV.mkBV w <$> getRandom
-  , encrypt = \k -> return . BV.xor k
+  , encrypt = \key -> return . BV.xor key
   , decrypt = BV.xor
   }
