@@ -19,6 +19,7 @@ import Crypto.Types
 import Data.List (nub, sortBy, sortOn, (\\))
 import qualified Data.Map as Map
 import Data.Maybe (fromJust)
+import Data.Ord (Down(..))
 import Math.Combinat.Permutations
 
 -- | A brute-force attack can be applied on any encryption scheme. Given a
@@ -50,9 +51,9 @@ bruteForceEnglish s keys ciphertext =
 breakSubstCipher :: [Alpha] -> (Permutation, [Alpha])
 breakSubstCipher ciphertext =
   let dist = getDistribution ciphertext
-      distLetters' = fst <$> reverse (sortOn snd (Map.toList dist))
+      distLetters' = fst <$> sortOn (Down . snd) (Map.toList dist)
       distLetters = distLetters' ++ ([A .. Z] \\ distLetters')
-      engLetters'  = fst <$> reverse (sortOn snd (Map.toList englishDistribution))
+      engLetters'  = fst <$> sortOn (Down . snd) (Map.toList englishDistribution)
       engLetters = engLetters' ++ ([A .. Z] \\ engLetters')
       pairs = zip engLetters distLetters
       sigma = toPermutation $
