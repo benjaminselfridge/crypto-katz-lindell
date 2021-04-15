@@ -1,6 +1,5 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ViewPatterns #-}
 
 -- | Types for, and examples of, encryption schemes found in Katz/Lindell.
 module Crypto.Schemes
