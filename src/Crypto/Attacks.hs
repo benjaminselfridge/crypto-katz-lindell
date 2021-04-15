@@ -5,6 +5,7 @@ module Crypto.Attacks
   ( -- * Attacks
     bruteForce
   , bruteForceEnglish
+  , breakSubstCipher
     -- * Handy distribution utilities
   , Distribution
   , getDistribution
@@ -12,11 +13,15 @@ module Crypto.Attacks
   , dotDistribution
   ) where
 
+import Debug.Trace
+
 import Crypto.Schemes
 import Crypto.Types
 
-import Data.List (nub, sortBy)
+import Data.List (nub, sortBy, sortOn, (\\))
 import qualified Data.Map as Map
+import Data.Maybe (fromJust)
+import Math.Combinat.Permutations
 
 -- | A brute-force attack can be applied on any encryption scheme. Given a
 -- ciphertext to decrypt, the scheme @s@ it was encrypted with, and a list of
@@ -41,6 +46,20 @@ bruteForceEnglish s keys ciphertext =
       o (k, p) (k', p') = abs ( eDot - getDistribution p  `dotDistribution` englishDistribution) `compare`
                           abs ( eDot - getDistribution p' `dotDistribution` englishDistribution)
   in sortBy o pairs
+
+-- | Attempts to break a substitution cipher given the ciphertext. This only
+-- gives a (usually prety bad) first guess based on English letter frequency.
+breakSubstCipher :: [Alpha] -> (Permutation, [Alpha])
+breakSubstCipher ciphertext =
+  let dist = getDistribution ciphertext
+      distLetters' = fst <$> reverse (sortOn snd (Map.toList dist))
+      distLetters = distLetters' ++ ([A .. Z] \\ distLetters')
+      engLetters'  = fst <$> reverse (sortOn snd (Map.toList englishDistribution))
+      engLetters = engLetters' ++ ([A .. Z] \\ engLetters')
+      pairs = zip engLetters distLetters
+      sigma = toPermutation $
+        map (\a -> 1 + fromEnum (fromJust (lookup a pairs))) [A .. Z]
+  in (sigma, decrypt substCipher sigma ciphertext)
 
 -- | A distribution of @a@s is a list of the probability of their occurrence in
 -- a given piece of plaintext.
