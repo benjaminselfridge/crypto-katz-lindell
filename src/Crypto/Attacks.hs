@@ -13,8 +13,6 @@ module Crypto.Attacks
   , dotDistribution
   ) where
 
-import Debug.Trace
-
 import Crypto.Schemes
 import Crypto.Types
 
