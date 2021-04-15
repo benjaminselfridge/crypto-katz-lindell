@@ -102,7 +102,7 @@ shiftAlpha i = toEnum . (`mod` 26) . (+i) . fromEnum
 -- 'vigenereCipher'. The key generator ignores its input.
 shiftCipher' :: PrivateKeyScheme Int Alpha Alpha
 shiftCipher' = PrivateKeyScheme
-  { generateKey = const $ getRandomR (0, 25)
+  { generateKey = const $ uniform [0 .. 25]
   , encrypt = \key -> return . shiftAlpha key
   , decrypt = shiftAlpha . negate
   }
