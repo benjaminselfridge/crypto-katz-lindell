@@ -104,7 +104,7 @@ shiftCipher' :: PrivateKeyScheme Int Alpha Alpha
 shiftCipher' = PrivateKeyScheme
   { generateKey = const $ getRandomR (0, 25)
   , encrypt = \key -> return . shiftAlpha key
-  , decrypt = \key -> shiftAlpha (negate key)
+  , decrypt = shiftAlpha . negate
   }
 
 -- | Shift cipher. The key is an 'Int' between 0 and 25 (inclusive), and we
