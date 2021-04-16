@@ -3,12 +3,13 @@
 
 -- | Types for, and examples of, encryption schemes found in Katz/Lindell.
 module Crypto.Schemes
-  ( -- * Private key encryption
-    -- ** Private key encryption schemes
-    PrivateKeyScheme(..)
-  , generateKey1
-  , EncryptFn
+  ( -- * Encryption and decryption
+    EncryptFn
   , DecryptFn
+    -- * Private key encryption
+    -- ** Private key encryption schemes
+  , PrivateKeyScheme(..)
+  , generateKey1
     -- ** New schemes from old
   , listScheme
   , cycleKeyScheme

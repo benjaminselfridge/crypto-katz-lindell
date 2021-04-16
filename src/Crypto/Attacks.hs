@@ -15,6 +15,7 @@ module Crypto.Attacks
     -- * Scheme-specific attacks
   , breakShiftCipher
   , breakShiftCipherEnglish
+  , breakShiftCipherKnownPlaintext
   , breakSubstCipher
     -- * Handy distribution utilities
   , Distribution
