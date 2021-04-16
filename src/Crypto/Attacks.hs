@@ -13,6 +13,8 @@ module Crypto.Attacks
   , bruteForceWithDist
   , bruteForceEnglish
     -- * Scheme-specific attacks
+  , breakShiftCipher
+  , breakShiftCipherEnglish
   , breakSubstCipher
     -- * Handy distribution utilities
   , Distribution
