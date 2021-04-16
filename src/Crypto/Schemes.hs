@@ -32,6 +32,15 @@ import qualified Data.List.NonEmpty as LN
 import Data.Maybe (fromJust)
 import Math.Combinat.Permutations
 
+-- | Encryption function mapping @plaintext@ to @ciphertext@. Note that
+-- encryption can be probabilistic (but doesn't have to be).
+type EncryptFn plaintext ciphertext =
+  forall m . MonadRandom m => plaintext -> m ciphertext
+
+-- | Decryption function mapping @ciphertext@ to @plaintext@. Note that
+-- decryption is deterministic.
+type DecryptFn plaintext ciphertext = ciphertext -> plaintext
+
 -- | Private key scheme, as defined in Katz/Lindell page 60 (Definition 3.7),
 -- but with generalized keys, plaintext, and ciphertext types.
 --
@@ -56,14 +65,6 @@ data PrivateKeyScheme key plaintext ciphertext = PrivateKeyScheme
 generateKey1 :: forall key plaintext ciphertext m . MonadRandom m
              => PrivateKeyScheme key plaintext ciphertext -> m key
 generateKey1 = flip generateKey 1
-
--- | Encryption function mapping @plaintext@ to @ciphertext@. Note that
--- encryption can be probabilistic (but doesn't have to be).
-type EncryptFn plaintext ciphertext = forall m . MonadRandom m => plaintext -> m ciphertext
-
--- | Decryption function mapping @ciphertext@ to @plaintext@. Note that
--- decryption is deterministic.
-type DecryptFn plaintext ciphertext = ciphertext -> plaintext
 
 -- | Lift a 'PrivateKeyScheme' to operate on lists of the @plaintext@ and
 -- @ciphertext@ types. The @key@ type doesn't change; we simply apply the same
