@@ -10,6 +10,7 @@ module Crypto.Attacks
   , ChosenCiphertextAttack
     -- * General attacks
   , bruteForce
+  , bruteForceWithDist
   , bruteForceEnglish
     -- * Scheme-specific attacks
   , breakSubstCipher
@@ -60,17 +61,26 @@ bruteForce :: [key] -- ^ list of keys to try
            -> CiphertextOnlyAttack key plaintext ciphertext
 bruteForce keys s ciphertext = zip keys (flip (decrypt s) ciphertext <$> keys)
 
--- | @bruteForce@ where @plaintext ~ [Alpha]@, sorted by closeness to English's
--- letter distribution.
+-- | A brute-force attack where @plaintext ~ [a]@ for some @Ord a => a@, sorted
+-- by closeness to a given letter distribution.
+bruteForceWithDist :: Ord a
+                   => Distribution a -- ^ reference distribution
+                   -> [key] -- ^ list of keys to try
+                   -> PrivateKeyScheme key [a] ciphertext
+                   -> CiphertextOnlyAttack key [a] ciphertext
+bruteForceWithDist refDist s keys ciphertext =
+  let pairs = bruteForce s keys ciphertext
+      rDot = refDist `dotDistribution` refDist
+      o (k, p) (k', p') = abs ( rDot - getDistribution p  `dotDistribution` refDist) `compare`
+                          abs ( rDot - getDistribution p' `dotDistribution` refDist)
+  in sortBy o pairs
+
+-- | A brute-force attack where @plaintext ~ [Alpha]@, sorted by closeness to
+-- English's letter distribution.
 bruteForceEnglish :: [key] -- ^ list of keys to try
                   -> PrivateKeyScheme key [Alpha] ciphertext
                   -> CiphertextOnlyAttack key [Alpha] ciphertext
-bruteForceEnglish s keys ciphertext =
-  let pairs = bruteForce s keys ciphertext
-      eDot = englishDistribution `dotDistribution` englishDistribution
-      o (k, p) (k', p') = abs ( eDot - getDistribution p  `dotDistribution` englishDistribution) `compare`
-                          abs ( eDot - getDistribution p' `dotDistribution` englishDistribution)
-  in sortBy o pairs
+bruteForceEnglish = bruteForceWithDist englishDistribution
 
 -- | Attempts to break a substitution cipher given an expected distribution of
 -- alphabetical characters.
@@ -96,13 +106,6 @@ getDistribution as =
   let counts = foldr (flip (Map.insertWith (+)) 1.0) Map.empty as
       totalCount = length as
   in fmap (/ fromIntegral totalCount) counts
-
--- | Computes @Sum p_i*q_i@, where @i@ indexes the @a@ type, and @p_i@, @q_i@
--- are the probabilities at @i@ of the two input distributions.
-dotDistribution :: Ord a => Distribution a -> Distribution a -> Float
-dotDistribution d1 d2 =
-  let as = nub (Map.keys d1 ++ Map.keys d2)
-  in sum $ map (\a -> Map.findWithDefault 0.0 a d1 * Map.findWithDefault 0.0 a d2) as
 
 -- | Average letter frequencies for English-language text, as given in
 -- Katz/Lindell page 13, Figure 1.2.
@@ -135,3 +138,10 @@ englishDistribution = Map.fromList
   , (Y, 0.001)
   , (Z, 0.001)
   ]
+
+-- | Computes @Sum p_i*q_i@, where @i@ indexes the @a@ type, and @p_i@, @q_i@
+-- are the probabilities at @i@ of the two input distributions.
+dotDistribution :: Ord a => Distribution a -> Distribution a -> Float
+dotDistribution d1 d2 =
+  let as = nub (Map.keys d1 ++ Map.keys d2)
+  in sum $ map (\a -> Map.findWithDefault 0.0 a d1 * Map.findWithDefault 0.0 a d2) as
