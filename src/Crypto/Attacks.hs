@@ -92,6 +92,22 @@ breakShiftCipher = bruteForce [0..25] shiftCipher
 breakShiftCipherEnglish :: CiphertextOnlyAttack Int [Alpha] [Alpha]
 breakShiftCipherEnglish = bruteForceEnglish [0..25] shiftCipher
 
+-- | Known-plaintext attack on 'shiftCipher'. Assumes the input pairs are valid;
+-- does not check for this. If the input list contains only pairs of empty
+-- strings, this degenerates into a brute-force attack. Assuming any of the
+-- input pairs contain nonempty strings, this is guaranteed to be correct for
+-- any shift cipher, and only produces one result.
+breakShiftCipherKnownPlaintext :: KnownPlaintextAttack Int [Alpha] [Alpha]
+breakShiftCipherKnownPlaintext [] ciphertext = breakShiftCipher ciphertext
+breakShiftCipherKnownPlaintext (([],_):pairs) ciphertext =
+  breakShiftCipherKnownPlaintext pairs ciphertext
+-- NB: The below case only happens if the input was invalid.
+breakShiftCipherKnownPlaintext ((_,[]):pairs) ciphertext =
+  breakShiftCipherKnownPlaintext pairs ciphertext
+breakShiftCipherKnownPlaintext ((p:ps,c:cs):_) ciphertext =
+  let key = (fromEnum c - fromEnum p) `mod` 26
+  in [(key, decrypt shiftCipher key ciphertext)]
+
 -- | Attempts to break a substitution cipher given an expected distribution of
 -- alphabetical characters.
 breakSubstCipher :: Distribution Alpha -> CiphertextOnlyAttack Permutation [Alpha] [Alpha]
