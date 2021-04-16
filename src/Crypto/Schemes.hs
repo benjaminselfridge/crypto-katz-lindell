@@ -3,13 +3,16 @@
 
 -- | Types for, and examples of, encryption schemes found in Katz/Lindell.
 module Crypto.Schemes
-  ( -- * Private key encryption schemes
+  ( -- * Private key encryption
+    -- ** Private key encryption schemes
     PrivateKeyScheme(..)
   , generateKey1
-    -- * New schemes from old
+  , EncryptFn
+  , DecryptFn
+    -- ** New schemes from old
   , listScheme
   , cycleKeyScheme
-    -- * Example private key ciphers
+    -- ** Example private key ciphers
   , shiftCipher'
   , shiftCipher
   , substCipher'
@@ -40,17 +43,26 @@ import Math.Combinat.Permutations
 data PrivateKeyScheme key plaintext ciphertext = PrivateKeyScheme
   { generateKey :: forall m . MonadRandom m => Int -> m key
     -- ^ Generate a random key from a given security parameter ('Int').
-  , encrypt :: forall m . MonadRandom m => key -> plaintext -> m ciphertext
-    -- ^ Encrypt plaintext with a given key. Note that encryption can be
-    -- probabilistic (but doesn't have to be).
-  , decrypt :: key -> ciphertext -> plaintext
-    -- ^ Decrypt plaintext with a given key. Decryption is deterministic.
+  , encrypt :: key -> EncryptFn plaintext ciphertext
+    -- ^ Encrypt plaintext with a given key.
+  , decrypt :: key -> DecryptFn plaintext ciphertext
+    -- ^ Decrypt plaintext with a given key.
   }
 
--- | Generate a key with a security parameter of @1@.
+-- | Generate a key with a security parameter of @1@. This is mostly useful for
+-- schemes that are known to ignore the security parameter (like a basic shift
+-- or substitution cipher).
 generateKey1 :: forall key plaintext ciphertext m . MonadRandom m
              => PrivateKeyScheme key plaintext ciphertext -> m key
 generateKey1 = flip generateKey 1
+
+-- | Encryption function mapping @plaintext@ to @ciphertext@. Note that
+-- encryption can be probabilistic (but doesn't have to be).
+type EncryptFn plaintext ciphertext = forall m . MonadRandom m => plaintext -> m ciphertext
+
+-- | Decryption function mapping @ciphertext@ to @plaintext@. Note that
+-- decryption is deterministic.
+type DecryptFn plaintext ciphertext = ciphertext -> plaintext
 
 -- | Lift a 'PrivateKeyScheme' to operate on lists of the @plaintext@ and
 -- @ciphertext@ types. The @key@ type doesn't change; we simply apply the same

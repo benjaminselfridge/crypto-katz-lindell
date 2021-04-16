@@ -1,10 +1,17 @@
+{-# LANGUAGE RankNTypes #-}
+
 -- | A library of attacks against various encryption schemes found in
 -- Katz/Lindell.
-
 module Crypto.Attacks
-  ( -- * Attacks
-    bruteForce
+  ( -- * Types of attacks
+    CiphertextOnlyAttack
+  , KnownPlaintextAttack
+  , ChosenPlaintextAttack
+  , ChosenCiphertextAttack
+    -- * General attacks
+  , bruteForce
   , bruteForceEnglish
+    -- * Scheme-specific attacks
   , breakSubstCipher
     -- * Handy distribution utilities
   , Distribution
@@ -16,29 +23,48 @@ module Crypto.Attacks
 import Crypto.Schemes
 import Crypto.Types
 
+import Control.Monad.Random
 import Data.List (nub, sortBy, sortOn, (\\))
 import qualified Data.Map as Map
 import Data.Maybe (fromJust)
 import Data.Ord (Down(..))
 import Math.Combinat.Permutations
 
+-- | A ciphertext-only attack is an attack that only needs the ciphertext to
+-- produce a result. (Katz/Lindell pg. 8)
+type CiphertextOnlyAttack key plaintext ciphertext = ciphertext -> [(key, plaintext)]
+
+-- | A known-plaintext attack takes a list of plaintext/ciphertext pairs which
+-- were all encrypted with the same key, and uses it to decrypt some other
+-- ciphertext encrypted by that key. (Katz/Lindell pg. 8)
+type KnownPlaintextAttack key plaintext ciphertext =
+  [(plaintext, ciphertext)] -> CiphertextOnlyAttack key plaintext ciphertext
+
+-- | A chosen-plaintext attack is an attack where the encryption function can be
+-- called arbitrarily, and the key remains fixed. (Katz/Lindell pg. 8)
+type ChosenPlaintextAttack key plaintext ciphertext =
+  EncryptFn plaintext ciphertext -> CiphertextOnlyAttack key plaintext ciphertext
+
+-- | A chosen-ciphertext attack is an attack where the decryption function can
+-- be called arbitrarily, and the key remains fixed. (Katz/Lindell pg. 8)
+type ChosenCiphertextAttack key plaintext ciphertext =
+  DecryptFn plaintext ciphertext -> CiphertextOnlyAttack key plaintext ciphertext
+
 -- | A brute-force attack can be applied on any encryption scheme. Given a
 -- ciphertext to decrypt, the scheme @s@ it was encrypted with, and a list of
 -- @key@s to try, simply apply @decrypt s key ciphertext@ for each @key@ in the
 -- list, and give a list of all the results along with the @key@s used to
 -- generate them.
-bruteForce :: PrivateKeyScheme key plaintext ciphertext
-           -> [key] -- ^ list of keys to try
-           -> ciphertext
-           -> [(key, plaintext)]
-bruteForce s keys ciphertext = zip keys (flip (decrypt s) ciphertext <$> keys)
+bruteForce :: [key] -- ^ list of keys to try
+           -> PrivateKeyScheme key plaintext ciphertext
+           -> CiphertextOnlyAttack key plaintext ciphertext
+bruteForce keys s ciphertext = zip keys (flip (decrypt s) ciphertext <$> keys)
 
 -- | @bruteForce@ where @plaintext ~ [Alpha]@, sorted by closeness to English's
 -- letter distribution.
-bruteForceEnglish :: PrivateKeyScheme key [Alpha] ciphertext
-                  -> [key] -- ^ list of keys to try
-                  -> ciphertext
-                  -> [(key, [Alpha])]
+bruteForceEnglish :: [key] -- ^ list of keys to try
+                  -> PrivateKeyScheme key [Alpha] ciphertext
+                  -> CiphertextOnlyAttack key [Alpha] ciphertext
 bruteForceEnglish s keys ciphertext =
   let pairs = bruteForce s keys ciphertext
       eDot = englishDistribution `dotDistribution` englishDistribution
@@ -46,19 +72,19 @@ bruteForceEnglish s keys ciphertext =
                           abs ( eDot - getDistribution p' `dotDistribution` englishDistribution)
   in sortBy o pairs
 
--- | Attempts to break a substitution cipher given the ciphertext. This only
--- gives a (usually prety bad) first guess based on English letter frequency.
-breakSubstCipher :: [Alpha] -> (Permutation, [Alpha])
-breakSubstCipher ciphertext =
+-- | Attempts to break a substitution cipher given an expected distribution of
+-- alphabetical characters.
+breakSubstCipher :: Distribution Alpha -> CiphertextOnlyAttack Permutation [Alpha] [Alpha]
+breakSubstCipher refDist ciphertext =
   let dist = getDistribution ciphertext
       distLetters' = fst <$> sortOn (Down . snd) (Map.toList dist)
       distLetters = distLetters' ++ ([A .. Z] \\ distLetters')
-      engLetters'  = fst <$> sortOn (Down . snd) (Map.toList englishDistribution)
-      engLetters = engLetters' ++ ([A .. Z] \\ engLetters')
-      pairs = zip engLetters distLetters
+      refLetters'  = fst <$> sortOn (Down . snd) (Map.toList refDist)
+      refLetters = refLetters' ++ ([A .. Z] \\ refLetters')
+      pairs = zip refLetters distLetters
       sigma = toPermutation $
         map (\a -> 1 + fromEnum (fromJust (lookup a pairs))) [A .. Z]
-  in (sigma, decrypt substCipher sigma ciphertext)
+  in [(sigma, decrypt substCipher sigma ciphertext)]
 
 -- | A distribution of @a@s is a list of the probability of their occurrence in
 -- a given piece of plaintext.
