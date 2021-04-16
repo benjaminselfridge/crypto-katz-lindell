@@ -82,6 +82,14 @@ bruteForceEnglish :: [key] -- ^ list of keys to try
                   -> CiphertextOnlyAttack key [Alpha] ciphertext
 bruteForceEnglish = bruteForceWithDist englishDistribution
 
+-- | Brute-force, ciphertext-only attack on 'shiftCipher'.
+breakShiftCipher :: CiphertextOnlyAttack Int [Alpha] [Alpha]
+breakShiftCipher = bruteForce [0..25] shiftCipher
+
+-- | Brute-force, English-biased ciphertext-only attack on 'shiftCipher'.
+breakShiftCipherEnglish :: CiphertextOnlyAttack Int [Alpha] [Alpha]
+breakShiftCipherEnglish = bruteForceEnglish [0..25] shiftCipher
+
 -- | Attempts to break a substitution cipher given an expected distribution of
 -- alphabetical characters.
 breakSubstCipher :: Distribution Alpha -> CiphertextOnlyAttack Permutation [Alpha] [Alpha]
