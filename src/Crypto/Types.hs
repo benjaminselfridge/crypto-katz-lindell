@@ -9,10 +9,14 @@ module Crypto.Types
   , alphaFromChar
   , alphasFromString
   , alphaToChar
+  , shiftAlpha
+  , permuteAlpha
   ) where
 
+import Data.Array.IArray ((!))
 import Data.Char (toUpper)
 import Data.Maybe (mapMaybe)
+import Math.Combinat.Permutations
 
 -- | Alphabetical character, for schemes that only use letters.
 data Alpha = A | B | C | D | E | F | G | H
@@ -85,3 +89,15 @@ alphaToChar Z = 'Z'
 -- uppercase and removing characters that are not alphabetical.
 alphasFromString :: String -> [Alpha]
 alphasFromString = mapMaybe (alphaFromChar . toUpper)
+
+-- | Shift an 'Alpha' by a given amount. The input 'Int' does not have to be
+-- between @0@ and @25@.
+shiftAlpha :: Int -> Alpha -> Alpha
+shiftAlpha i = toEnum . (`mod` 26) . (+i) . fromEnum
+
+-- | Apply a permutation to an 'Alpha'. Assumes the input permutation is a
+-- permutation on @[0..25]@.
+permuteAlpha :: Permutation -> Alpha -> Alpha
+permuteAlpha sigma a = fromPermIx (permutationUArray sigma ! toPermIx a)
+  where toPermIx = (+ 1) . fromEnum
+        fromPermIx = toEnum . subtract 1

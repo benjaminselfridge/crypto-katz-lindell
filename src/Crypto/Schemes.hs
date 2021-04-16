@@ -108,9 +108,6 @@ cycleKeyScheme s securityParam = PrivateKeyScheme
 
   where msg = "generateKey called with non-positive key length"
 
-shiftAlpha :: Int -> Alpha -> Alpha
-shiftAlpha i = toEnum . (`mod` 26) . (+i) . fromEnum
-
 -- | Shift cipher for single 'Alpha'. This is used to define 'shiftCipher' and
 -- 'vigenereCipher'. The key generator ignores its input.
 shiftCipher' :: PrivateKeyScheme Int Alpha Alpha
@@ -143,8 +140,8 @@ vigenereCipher = cycleKeyScheme shiftCipher' undefined
 substCipher' :: PrivateKeyScheme Permutation Alpha Alpha
 substCipher' = PrivateKeyScheme
   { generateKey = const $ fst . randomPermutation 26 . mkStdGen <$> getRandom
-  , encrypt = \key -> return . fromJust . flip lookup (zip [A .. Z] (permuteList key [A .. Z]))
-  , decrypt = \key -> fromJust . flip lookup (zip (permuteList key [A .. Z]) [A .. Z])
+  , encrypt = \key -> return . permuteAlpha key
+  , decrypt = permuteAlpha . inverse
   }
 
 -- | Substitution cipher. They key is a 'Permutation' on the alphabet, and we
