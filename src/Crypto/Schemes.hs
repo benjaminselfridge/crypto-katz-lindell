@@ -138,7 +138,8 @@ polyAlphaShiftCipher :: PrivateKeyScheme (LN.NonEmpty Int) [Alpha] [Alpha]
 polyAlphaShiftCipher = polyCipher alphaShiftCipher undefined
 
 -- | Substitution cipher for single 'Alpha'. This is used to define
--- 'monoAlphaSubstCipher'. The key generator ignores its input.
+-- 'monoAlphaSubstCipher' and 'polyAlphaSubstCipher'. The key generator ignores
+-- its input.
 alphaSubstCipher :: PrivateKeyScheme Permutation Alpha Alpha
 alphaSubstCipher = PrivateKeyScheme
   { generateKey = const $ fst . randomPermutation 26 . mkStdGen <$> getRandom
