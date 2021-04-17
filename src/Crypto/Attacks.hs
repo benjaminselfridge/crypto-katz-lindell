@@ -12,7 +12,7 @@ module Crypto.Attacks
   , bruteForce
   , bruteForceWithDist
   , bruteForceEnglish
-  , guessKeyLengthCycle
+  , guessCycleKeyLength
     -- * Scheme-specific attacks
   , breakShiftCipher
   , breakShiftCipherEnglish
@@ -92,8 +92,8 @@ bruteForceEnglish = bruteForceWithDist englishDistribution
 -- at the head of the list. This should work regardless of the underlying
 -- per-character cipher (since the underlying cipher is necessarily a
 -- substitution).
-guessKeyLengthCycle :: Int -> [Alpha] -> [Int]
-guessKeyLengthCycle maxKeyLength as =
+guessCycleKeyLength :: Int -> [Alpha] -> [Int]
+guessCycleKeyLength maxKeyLength as =
   fst <$> sortBy f (withArg (eDistance . flip distWithKeyLength as) <$> [1 .. maxKeyLength])
   where withArg f a = (a, f a)
         eDistance dist = abs (dist `dotDistribution` dist - eDot)
