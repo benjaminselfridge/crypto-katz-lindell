@@ -17,6 +17,7 @@ module Crypto.Attacks
   , breakShiftCipherEnglish
   , breakShiftCipherKnownPlaintext
   , breakSubstCipher
+  , guessKeyLengthVigenere
     -- * Handy distribution utilities
   , Distribution
   , getDistribution
@@ -28,7 +29,7 @@ import Crypto.Schemes
 import Crypto.Types
 
 import Control.Monad.Random
-import Data.List (nub, sortBy, sortOn, (\\))
+import Data.List (nub, sortBy, sortOn, (\\), minimumBy)
 import qualified Data.Map as Map
 import Data.Maybe (fromJust)
 import Data.Ord (Down(..))
@@ -64,13 +65,13 @@ bruteForce :: [key] -- ^ list of keys to try
            -> CiphertextOnlyAttack key plaintext ciphertext
 bruteForce keys s ciphertext = zip keys (flip (decrypt s) ciphertext <$> keys)
 
--- | A brute-force attack where @plaintext ~ [a]@ for some @Ord a => a@, sorted
--- by closeness to a given letter distribution.
-bruteForceWithDist :: Ord a
-                   => Distribution a -- ^ reference distribution
+-- | A brute-force attack where @plaintext ~ [plainchar]@ for some @Ord
+-- plainchar => plainchar@, sorted by closeness to a given letter distribution.
+bruteForceWithDist :: Ord plainchar
+                   => Distribution plainchar -- ^ reference distribution
                    -> [key] -- ^ list of keys to try
-                   -> PrivateKeyScheme key [a] ciphertext
-                   -> CiphertextOnlyAttack key [a] ciphertext
+                   -> PrivateKeyScheme key [plainchar] ciphertext
+                   -> CiphertextOnlyAttack key [plainchar] ciphertext
 bruteForceWithDist refDist s keys ciphertext =
   let pairs = bruteForce s keys ciphertext
       rDot = refDist `dotDistribution` refDist
@@ -122,6 +123,26 @@ breakSubstCipher refDist ciphertext =
       sigma = toPermutation $
         map (\a -> 1 + fromEnum (fromJust (lookup a pairs))) [A .. Z]
   in [(sigma, decrypt substCipher sigma ciphertext)]
+
+-- | Guess the key length given a ciphertext encoded using 'vigenereCipher',
+-- assuming it was encoded in English. The output is a list of 'Int's, sorted
+-- with the likeliest key length at the head of the list.
+guessKeyLengthVigenere :: Int -> [Alpha] -> [Int]
+guessKeyLengthVigenere maxKeyLength as =
+  fst <$> sortBy f (withArg (eDistance . flip distWithKeyLength as) <$> [1 .. maxKeyLength])
+  where withArg f a = (a, f a)
+        eDistance dist = abs (dist `dotDistribution` dist - eDot)
+        eDot = englishDistribution `dotDistribution` englishDistribution
+        f a b = snd a `compare` snd b
+
+distWithKeyLength :: Int -> [Alpha] -> Distribution Alpha
+distWithKeyLength i = getDistribution . everyNth i
+
+-- | Only call this with positive 'Int's
+everyNth :: Int -> [a] -> [a]
+everyNth i _ | i <= 0 = error "everyNth called with non-positive int"
+everyNth _ [] = []
+everyNth i as = head as : everyNth i (drop i as)
 
 -- | A distribution of @a@s is a list of the probability of their occurrence in
 -- a given piece of plaintext.
