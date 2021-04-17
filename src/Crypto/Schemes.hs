@@ -11,8 +11,8 @@ module Crypto.Schemes
   , PrivateKeyScheme(..)
   , generateKey1
     -- ** New schemes from old
-  , listScheme
-  , cycleKeyScheme
+  , liftCharCipher
+  , cycleKeyCipher
     -- ** Example private key ciphers
   , shiftCipher'
   , shiftCipher
@@ -66,13 +66,14 @@ generateKey1 :: forall key plaintext ciphertext m . MonadRandom m
              => PrivateKeyScheme key plaintext ciphertext -> m key
 generateKey1 = flip generateKey 1
 
--- | Lift a 'PrivateKeyScheme' to operate on lists of the @plaintext@ and
--- @ciphertext@ types. The @key@ type doesn't change; we simply apply the same
--- key to each element of the lists. The resulting scheme is by definition
--- length-preserving on both encryption and decryption.
-listScheme :: PrivateKeyScheme key plaintext ciphertext
-           -> PrivateKeyScheme key [plaintext] [ciphertext]
-listScheme s = PrivateKeyScheme
+-- | Given a 'PrivateKeyScheme' that maps invidual characters of @plaintext@ to
+-- individual characters of @ciphertext@, lift that scheme to one that operates
+-- on strings. The new scheme uses the same @key@ type as the per-character
+-- scheme, and encrypts/decrypts by mapping the input scheme's 'encrypt' and
+-- 'decrypt' functions over the strings.
+liftCharCipher :: PrivateKeyScheme key plainchar cipherchar
+               -> PrivateKeyScheme key [plainchar] [cipherchar]
+liftCharCipher s = PrivateKeyScheme
   { generateKey = generateKey s
   , encrypt = traverse . encrypt s
   , decrypt = map . decrypt s
@@ -91,12 +92,12 @@ listScheme s = PrivateKeyScheme
 --
 -- If the key length is non-positive, the key generation will throw a runtime
 -- error.
-cycleKeyScheme :: PrivateKeyScheme key plaintext ciphertext
+cycleKeyCipher :: PrivateKeyScheme key plaintext ciphertext
                -> Int
                -- ^ The security parameter to pass to the input scheme's
                -- key generator.
                -> PrivateKeyScheme (LN.NonEmpty key) [plaintext] [ciphertext]
-cycleKeyScheme s securityParam = PrivateKeyScheme
+cycleKeyCipher s securityParam = PrivateKeyScheme
   { generateKey = \keyLength -> do
       ks <- replicateM keyLength (generateKey s securityParam)
       case LN.nonEmpty ks of
@@ -121,19 +122,19 @@ shiftCipher' = PrivateKeyScheme
 -- shift each character by that amount to encrypt.
 --
 -- @
--- shiftCipher == listScheme shiftCipher'
+-- shiftCipher == liftCharCipher shiftCipher'
 -- @
 shiftCipher :: PrivateKeyScheme Int [Alpha] [Alpha]
-shiftCipher = listScheme shiftCipher'
+shiftCipher = liftCharCipher shiftCipher'
 
 -- | Vigenère cipher. This promotes the normal 'shiftCipher' to operate on lists
 -- of keys.
 --
 -- @
--- vigenereCipher = cycleKeyScheme shiftCipher' undefined
+-- vigenereCipher = cycleKeyCipher shiftCipher' undefined
 -- @
 vigenereCipher :: PrivateKeyScheme (LN.NonEmpty Int) [Alpha] [Alpha]
-vigenereCipher = cycleKeyScheme shiftCipher' undefined
+vigenereCipher = cycleKeyCipher shiftCipher' undefined
 
 -- | Substitution cipher for single 'Alpha'. This is used to define
 -- 'substCipher'. The key generator ignores its input.
@@ -147,7 +148,7 @@ substCipher' = PrivateKeyScheme
 -- | Substitution cipher. They key is a 'Permutation' on the alphabet, and we
 -- simply apply the permutation to encrypt.
 substCipher :: PrivateKeyScheme Permutation [Alpha] [Alpha]
-substCipher = listScheme substCipher'
+substCipher = liftCharCipher substCipher'
 
 -- | One-time pad on bitvectors of a given length.
 oneTimePad :: BV.NatRepr w -> PrivateKeyScheme (BV.BV w) (BV.BV w) (BV.BV w)
