@@ -12,12 +12,12 @@ module Crypto.Attacks
   , bruteForce
   , bruteForceWithDist
   , bruteForceEnglish
+  , guessKeyLengthCycle
     -- * Scheme-specific attacks
   , breakShiftCipher
   , breakShiftCipherEnglish
   , breakShiftCipherKnownPlaintext
   , breakSubstCipher
-  , guessKeyLengthVigenere
     -- * Handy distribution utilities
   , Distribution
   , getDistribution
@@ -86,6 +86,20 @@ bruteForceEnglish :: [key] -- ^ list of keys to try
                   -> CiphertextOnlyAttack key [Alpha] ciphertext
 bruteForceEnglish = bruteForceWithDist englishDistribution
 
+-- | Guess the key length given a ciphertext encoded using a poly-alphabetic
+-- cipher, i.e. a cipher defined using 'polyCipher', assuming it was encoded in
+-- English. The output is a list of 'Int's, sorted with the likeliest key length
+-- at the head of the list. This should work regardless of the underlying
+-- per-character cipher (since the underlying cipher is necessarily a
+-- substitution).
+guessKeyLengthCycle :: Int -> [Alpha] -> [Int]
+guessKeyLengthCycle maxKeyLength as =
+  fst <$> sortBy f (withArg (eDistance . flip distWithKeyLength as) <$> [1 .. maxKeyLength])
+  where withArg f a = (a, f a)
+        eDistance dist = abs (dist `dotDistribution` dist - eDot)
+        eDot = englishDistribution `dotDistribution` englishDistribution
+        f a b = snd a `compare` snd b
+
 -- | Brute-force, ciphertext-only attack on 'monoAlphaShiftCipher'.
 breakShiftCipher :: CiphertextOnlyAttack Int [Alpha] [Alpha]
 breakShiftCipher = bruteForce [0..25] monoAlphaShiftCipher
@@ -123,17 +137,6 @@ breakSubstCipher refDist ciphertext =
       sigma = toPermutation $
         map (\a -> 1 + fromEnum (fromJust (lookup a pairs))) [A .. Z]
   in [(sigma, decrypt monoAlphaSubstCipher sigma ciphertext)]
-
--- | Guess the key length given a ciphertext encoded using 'vigenereCipher',
--- assuming it was encoded in English. The output is a list of 'Int's, sorted
--- with the likeliest key length at the head of the list.
-guessKeyLengthVigenere :: Int -> [Alpha] -> [Int]
-guessKeyLengthVigenere maxKeyLength as =
-  fst <$> sortBy f (withArg (eDistance . flip distWithKeyLength as) <$> [1 .. maxKeyLength])
-  where withArg f a = (a, f a)
-        eDistance dist = abs (dist `dotDistribution` dist - eDot)
-        eDot = englishDistribution `dotDistribution` englishDistribution
-        f a b = snd a `compare` snd b
 
 distWithKeyLength :: Int -> [Alpha] -> Distribution Alpha
 distWithKeyLength i = getDistribution . everyNth i

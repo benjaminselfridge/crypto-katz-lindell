@@ -19,6 +19,7 @@ module Crypto.Schemes
   , polyAlphaShiftCipher
   , alphaSubstCipher
   , monoAlphaSubstCipher
+  , polyAlphaSubstCipher
   , oneTimePad
   ) where
 
@@ -66,10 +67,10 @@ generateKey1 :: forall key plaintext ciphertext m . MonadRandom m
              => PrivateKeyScheme key plaintext ciphertext -> m key
 generateKey1 = flip generateKey 1
 
--- | Given a 'PrivateKeyScheme' that maps individual characters, lift that
--- scheme to one that operates on strings. The new scheme uses the same @key@
--- type as the per-character scheme, and encrypts/decrypts by mapping the input
--- scheme's 'encrypt' and 'decrypt' functions over the strings.
+-- | Given a 'PrivateKeyScheme' that operates on individual characters, lift
+-- that scheme to one that operates on strings. The new scheme uses the same
+-- @key@ type as the per-character scheme, and encrypts/decrypts by mapping the
+-- input scheme's 'encrypt' and 'decrypt' functions over the strings.
 monoCipher :: PrivateKeyScheme key plainchar cipherchar
            -> PrivateKeyScheme key [plainchar] [cipherchar]
 monoCipher s = PrivateKeyScheme
@@ -78,11 +79,11 @@ monoCipher s = PrivateKeyScheme
   , decrypt = map . decrypt s
   }
 
--- | Given a 'PrivateKeyScheme' that maps individual characters, generate a new
--- scheme that operates on strings. The new scheme uses a /list/ of @key@s, and
--- encrypts/decrypts by cycling through this list, applying each @key@ to each
--- character of plaintext. When we run out of keys, start over with the original
--- list.
+-- | Given a 'PrivateKeyScheme' that operates on individual characters, generate
+-- a new scheme that operates on strings. The new scheme uses a /list/ of
+-- @key@s, and encrypts/decrypts by cycling through this list, applying each
+-- @key@ to each character of plaintext. When we run out of keys, start over
+-- with the original list.
 --
 -- The security parameter of the lifted scheme will determine the length of the
 -- key produced by the 'generateKey' function. The 'Int' that is passed to this
