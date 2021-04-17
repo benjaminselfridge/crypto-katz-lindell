@@ -11,14 +11,14 @@ module Crypto.Schemes
   , PrivateKeyScheme(..)
   , generateKey1
     -- ** New schemes from old
-  , liftCharCipher
-  , cycleKeyCipher
+  , monoCipher
+  , polyCipher
     -- ** Example private key ciphers
-  , shiftCipher'
-  , shiftCipher
-  , substCipher'
-  , substCipher
-  , vigenereCipher
+  , alphaShiftCipher
+  , monoAlphaShiftCipher
+  , polyAlphaShiftCipher
+  , alphaSubstCipher
+  , monoAlphaSubstCipher
   , oneTimePad
   ) where
 
@@ -66,38 +66,37 @@ generateKey1 :: forall key plaintext ciphertext m . MonadRandom m
              => PrivateKeyScheme key plaintext ciphertext -> m key
 generateKey1 = flip generateKey 1
 
--- | Given a 'PrivateKeyScheme' that maps invidual characters of @plaintext@ to
--- individual characters of @ciphertext@, lift that scheme to one that operates
--- on strings. The new scheme uses the same @key@ type as the per-character
--- scheme, and encrypts/decrypts by mapping the input scheme's 'encrypt' and
--- 'decrypt' functions over the strings.
-liftCharCipher :: PrivateKeyScheme key plainchar cipherchar
-               -> PrivateKeyScheme key [plainchar] [cipherchar]
-liftCharCipher s = PrivateKeyScheme
+-- | Given a 'PrivateKeyScheme' that maps individual characters, lift that
+-- scheme to one that operates on strings. The new scheme uses the same @key@
+-- type as the per-character scheme, and encrypts/decrypts by mapping the input
+-- scheme's 'encrypt' and 'decrypt' functions over the strings.
+monoCipher :: PrivateKeyScheme key plainchar cipherchar
+           -> PrivateKeyScheme key [plainchar] [cipherchar]
+monoCipher s = PrivateKeyScheme
   { generateKey = generateKey s
   , encrypt = traverse . encrypt s
   , decrypt = map . decrypt s
   }
 
--- | Lift a 'PrivateKeyScheme' to operate on lists of the @plaintext@ and
--- @ciphertext@ types. The @key@ type becomes a nonempty list of the original
--- @key@. We encrypt using each key in the list, one-at-a-time, for each element
--- in the @plaintext@ list. When we run out of @key@ values, we start over with
--- the original list.
+-- | Given a 'PrivateKeyScheme' that maps individual characters, generate a new
+-- scheme that operates on strings. The new scheme uses a /list/ of @key@s, and
+-- encrypts/decrypts by cycling through this list, applying each @key@ to each
+-- character of plaintext. When we run out of keys, start over with the original
+-- list.
 --
--- The security parameter of the resulting scheme will determine the length of
--- the key produced by the 'generateKey' function. The 'Int' that is passed to
--- this function will be used as the security parameter that gets fed to the
+-- The security parameter of the lifted scheme will determine the length of the
+-- key produced by the 'generateKey' function. The 'Int' that is passed to this
+-- function will be used as the security parameter that gets fed to the
 -- 'generateKey' of the input scheme.
 --
 -- If the key length is non-positive, the key generation will throw a runtime
 -- error.
-cycleKeyCipher :: PrivateKeyScheme key plaintext ciphertext
+polyCipher :: PrivateKeyScheme key plaintext ciphertext
                -> Int
                -- ^ The security parameter to pass to the input scheme's
                -- key generator.
                -> PrivateKeyScheme (LN.NonEmpty key) [plaintext] [ciphertext]
-cycleKeyCipher s securityParam = PrivateKeyScheme
+polyCipher s securityParam = PrivateKeyScheme
   { generateKey = \keyLength -> do
       ks <- replicateM keyLength (generateKey s securityParam)
       case LN.nonEmpty ks of
@@ -109,46 +108,61 @@ cycleKeyCipher s securityParam = PrivateKeyScheme
 
   where msg = "generateKey called with non-positive key length"
 
--- | Shift cipher for single 'Alpha'. This is used to define 'shiftCipher' and
--- 'vigenereCipher'. The key generator ignores its input.
-shiftCipher' :: PrivateKeyScheme Int Alpha Alpha
-shiftCipher' = PrivateKeyScheme
+-- | Shift cipher for single 'Alpha'. This is used to define
+-- 'monoAlphaShiftCipher' and 'polyAlphaShiftCipher'. The key generator ignores
+-- its input.
+alphaShiftCipher :: PrivateKeyScheme Int Alpha Alpha
+alphaShiftCipher = PrivateKeyScheme
   { generateKey = const $ uniform [0 .. 25]
   , encrypt = \key -> return . shiftAlpha key
   , decrypt = shiftAlpha . negate
   }
 
--- | Shift cipher. The key is an 'Int' between 0 and 25 (inclusive), and we
--- shift each character by that amount to encrypt.
+-- | Mono-alphabetic shift cipher. The key is an 'Int' between 0 and 25
+-- (inclusive), and we shift each character by that amount to encrypt.
 --
 -- @
--- shiftCipher == liftCharCipher shiftCipher'
+-- monoAlphaShiftCipher == monoCipher alphaShiftCipher
 -- @
-shiftCipher :: PrivateKeyScheme Int [Alpha] [Alpha]
-shiftCipher = liftCharCipher shiftCipher'
+monoAlphaShiftCipher :: PrivateKeyScheme Int [Alpha] [Alpha]
+monoAlphaShiftCipher = monoCipher alphaShiftCipher
 
--- | Vigenère cipher. This promotes the normal 'shiftCipher' to operate on lists
--- of keys.
+-- | Poly-alphabetic shift cipher, also known as Vigenère cipher. This promotes
+-- the normal 'alphaShiftCipher' to operate on lists of keys.
 --
 -- @
--- vigenereCipher = cycleKeyCipher shiftCipher' undefined
+-- polyAlphaShiftCipher == polyCipher alphaShiftCipher undefined
 -- @
-vigenereCipher :: PrivateKeyScheme (LN.NonEmpty Int) [Alpha] [Alpha]
-vigenereCipher = cycleKeyCipher shiftCipher' undefined
+polyAlphaShiftCipher :: PrivateKeyScheme (LN.NonEmpty Int) [Alpha] [Alpha]
+polyAlphaShiftCipher = polyCipher alphaShiftCipher undefined
 
 -- | Substitution cipher for single 'Alpha'. This is used to define
--- 'substCipher'. The key generator ignores its input.
-substCipher' :: PrivateKeyScheme Permutation Alpha Alpha
-substCipher' = PrivateKeyScheme
+-- 'monoAlphaSubstCipher'. The key generator ignores its input.
+alphaSubstCipher :: PrivateKeyScheme Permutation Alpha Alpha
+alphaSubstCipher = PrivateKeyScheme
   { generateKey = const $ fst . randomPermutation 26 . mkStdGen <$> getRandom
   , encrypt = \key -> return . permuteAlpha key
   , decrypt = permuteAlpha . inverse
   }
 
--- | Substitution cipher. They key is a 'Permutation' on the alphabet, and we
--- simply apply the permutation to encrypt.
-substCipher :: PrivateKeyScheme Permutation [Alpha] [Alpha]
-substCipher = liftCharCipher substCipher'
+-- | Mono-alphabetic substitution cipher. The key is a 'Permutation' of the
+-- alphabet, and we apply the permutation to each character in the input to
+-- encrypt.
+--
+-- @
+-- monoAlphaSubstCipher == monoCipher alphaSubstCipher
+-- @
+monoAlphaSubstCipher :: PrivateKeyScheme Permutation [Alpha] [Alpha]
+monoAlphaSubstCipher = monoCipher alphaSubstCipher
+
+-- | Poly-alphabetic substitution cipher. This promotes the normal
+-- 'alphaSubstCipher' to operate on lists of keys.
+--
+-- @
+-- polyAlphaSubstCipher == polyCipher alphaSubstCipher undefined
+-- @
+polyAlphaSubstCipher :: PrivateKeyScheme (LN.NonEmpty Permutation) [Alpha] [Alpha]
+polyAlphaSubstCipher = polyCipher alphaSubstCipher undefined
 
 -- | One-time pad on bitvectors of a given length.
 oneTimePad :: BV.NatRepr w -> PrivateKeyScheme (BV.BV w) (BV.BV w) (BV.BV w)

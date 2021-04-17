@@ -86,15 +86,15 @@ bruteForceEnglish :: [key] -- ^ list of keys to try
                   -> CiphertextOnlyAttack key [Alpha] ciphertext
 bruteForceEnglish = bruteForceWithDist englishDistribution
 
--- | Brute-force, ciphertext-only attack on 'shiftCipher'.
+-- | Brute-force, ciphertext-only attack on 'monoAlphaShiftCipher'.
 breakShiftCipher :: CiphertextOnlyAttack Int [Alpha] [Alpha]
-breakShiftCipher = bruteForce [0..25] shiftCipher
+breakShiftCipher = bruteForce [0..25] monoAlphaShiftCipher
 
--- | Brute-force, English-biased ciphertext-only attack on 'shiftCipher'.
+-- | Brute-force, English-biased ciphertext-only attack on 'monoAlphaShiftCipher'.
 breakShiftCipherEnglish :: CiphertextOnlyAttack Int [Alpha] [Alpha]
-breakShiftCipherEnglish = bruteForceEnglish [0..25] shiftCipher
+breakShiftCipherEnglish = bruteForceEnglish [0..25] monoAlphaShiftCipher
 
--- | Known-plaintext attack on 'shiftCipher'. Assumes the input pairs are valid;
+-- | Known-plaintext attack on 'monoAlphaShiftCipher'. Assumes the input pairs are valid;
 -- does not check for this. If the input list contains only pairs of empty
 -- strings, this degenerates into a brute-force attack. Assuming any of the
 -- input pairs contain nonempty strings, this is guaranteed to be correct for
@@ -108,7 +108,7 @@ breakShiftCipherKnownPlaintext ((_,[]):pairs) ciphertext =
   breakShiftCipherKnownPlaintext pairs ciphertext
 breakShiftCipherKnownPlaintext ((p:ps,c:cs):_) ciphertext =
   let key = (fromEnum c - fromEnum p) `mod` 26
-  in [(key, decrypt shiftCipher key ciphertext)]
+  in [(key, decrypt monoAlphaShiftCipher key ciphertext)]
 
 -- | Attempts to break a substitution cipher given an expected distribution of
 -- alphabetical characters.
@@ -122,7 +122,7 @@ breakSubstCipher refDist ciphertext =
       pairs = zip refLetters distLetters
       sigma = toPermutation $
         map (\a -> 1 + fromEnum (fromJust (lookup a pairs))) [A .. Z]
-  in [(sigma, decrypt substCipher sigma ciphertext)]
+  in [(sigma, decrypt monoAlphaSubstCipher sigma ciphertext)]
 
 -- | Guess the key length given a ciphertext encoded using 'vigenereCipher',
 -- assuming it was encoded in English. The output is a list of 'Int's, sorted
