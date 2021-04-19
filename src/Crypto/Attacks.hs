@@ -68,13 +68,13 @@ bruteForce keys s ciphertext = zip keys (flip (decrypt s) ciphertext <$> keys)
 -- | A brute-force attack where @plaintext ~ [plainchar]@ for some @Ord
 -- plainchar => plainchar@, sorted by closeness to a given letter distribution.
 bruteForceWithDist :: Ord plainchar
-                   => Distribution plainchar -- ^ reference distribution
+                   => NDistribution plainchar -- ^ reference distribution
                    -> [key] -- ^ list of keys to try
                    -> PrivateKeyScheme key [plainchar] ciphertext
                    -> CiphertextOnlyAttack key [plainchar] ciphertext
 bruteForceWithDist refDist s keys ciphertext =
   let pairs = bruteForce s keys ciphertext
-  in sortBy (comparing (d' refDist . getDist . snd)) pairs
+  in sortBy (comparing (d' refDist . getNDist . snd)) pairs
 
 -- | A brute-force attack where @plaintext ~ [Alpha]@, sorted by closeness to
 -- English's letter distribution.
@@ -96,7 +96,7 @@ guessPolyAlphaKeyLength :: [Int]
                         -> [(Int, Float)]
 guessPolyAlphaKeyLength keyLengths ciphertext =
   sortBy (comparing snd) $ zip keyLengths (map f keyLengths)
-  where f = avg . map (d englishDist . getDist) . flip slices ciphertext
+  where f = avg . map (d englishDist . getNDist) . flip slices ciphertext
 
 -- | Given an attack on a scheme produced by 'mono', lift it to an attack
 -- on a scheme produced by 'poly' assuming we know the key length. Use in
@@ -145,9 +145,10 @@ breakMonoAlphaShiftKnownPlaintext ((p:ps,c:cs):_) ciphertext =
 
 -- | Attempts to break a mono-alphabetic substitution cipher given an expected
 -- distribution of alphabetical characters. Needs improvement.
-breakMonoAlphaSubst :: Distribution Alpha -> CiphertextOnlyAttack Permutation [Alpha] [Alpha]
+breakMonoAlphaSubst :: NDistribution Alpha
+                    -> CiphertextOnlyAttack Permutation [Alpha] [Alpha]
 breakMonoAlphaSubst refDist ciphertext =
-  let dist = getDist ciphertext
+  let dist = getNDist ciphertext
       distLetters' = fst <$> sortOn (Down . snd) (Map.toList dist)
       distLetters = distLetters' ++ ([A .. Z] \\ distLetters')
       refLetters'  = fst <$> sortOn (Down . snd) (Map.toList refDist)

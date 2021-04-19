@@ -7,18 +7,27 @@ module Crypto.Utils
   -- * Distributions and related functions
   , Distribution
   , getDist
+  , NDistribution
+  , getNDist
   , englishDist
   , ioc
   , d
   , d'
+  -- * Ngrams and related functions
+  , NgramCount
+  , ngrams
+  , ngramsFromFile
   ) where
 
 import Crypto.Types
 
-import Data.List (transpose, permutations, nub)
-import Data.List.Split (chunksOf)
+import Data.List (transpose, permutations, nub, tails)
+import Data.List.Split (chunksOf, splitOn)
 import qualified Data.Map as Map
+import Data.Maybe (mapMaybe)
+import Data.Traversable (forM)
 import Math.Combinat.Compositions
+import System.IO
 
 -- | 'slices' splits a list into @n@ pieces. The pieces are constructed by
 -- taking every @n+k@th element of the list, where @k@ ranges from @0@ to @n-1@.
@@ -68,20 +77,24 @@ sequencePreferred numRows numCols as =
   let ixss = indices numRows numCols
   in map (zipWith (!!) as) ixss
 
--- | A distribution of @a@s is a list of the probability of their occurrence in
--- a given piece of plaintext.
-type Distribution a = Map.Map a Float
+-- | A distribution of @a@s is a occurrence map, assigning each @a@ to some
+-- numeric type @b@.
+type Distribution a b = Map.Map a b
 
--- | Compute a 'Distribution' from an input list.
-getDist :: Ord a => [a] -> Distribution a
-getDist as =
-  let counts = foldr (flip (Map.insertWith (+)) 1.0) Map.empty as
-      totalCount = length as
-  in fmap (/ fromIntegral totalCount) counts
+getDist :: Ord a => [a] -> Distribution a Integer
+getDist as = foldr (flip (Map.insertWith (+)) 1) Map.empty as
+
+-- | A normalized 'Distribution', where the values are normalized to 'Float's
+-- that add up to @1@.
+type NDistribution a = Distribution a Float
+
+-- | Compute a 'NDistribution' from an input list.
+getNDist :: Ord a => [a] -> NDistribution a
+getNDist as = fmap ((/ fromIntegral (length as)) . fromInteger) (getDist as)
 
 -- | Average letter frequencies for English-language text, as given in
 -- Katz/Lindell page 13, Figure 1.2.
-englishDist :: Distribution Alpha
+englishDist :: NDistribution Alpha
 englishDist = Map.fromList
   [ (A, 0.082)
   , (B, 0.015)
@@ -114,7 +127,7 @@ englishDist = Map.fromList
 -- | Given two distributions over the same type, get their index of coincidence.
 -- Computes @Sum p_i*q_i@, where @i@ indexes the @a@ type, and @p_i@, @q_i@ are
 -- the probabilities at @i@ of the two input distributions.
-ioc :: Ord a => Distribution a -> Distribution a -> Float
+ioc :: Ord a => NDistribution a -> NDistribution a -> Float
 ioc d1 d2 =
   let as = nub (Map.keys d1 ++ Map.keys d2)
   in sum $ map (\a -> Map.findWithDefault 0.0 a d1 * Map.findWithDefault 0.0 a d2) as
@@ -125,11 +138,46 @@ ioc d1 d2 =
 -- plaintext/, where the encryption is performed with a simple substitution
 -- cipher, assuming the first is the probability distribution we'd expect from
 -- plaintext.
-d :: Ord a => Distribution a -> Distribution a -> Float
+d :: Ord a => NDistribution a -> NDistribution a -> Float
 d dist1 dist2 = abs (dist1 `ioc` dist1 - dist2 `ioc` dist2)
 
 -- | Computes the distance of the second distribution from the first. This
 -- should be small if the second distribution is /decrypted plaintext/, assuming
 -- the first is the probability distribution we'd expect from plaintext.
-d' :: Ord a => Distribution a -> Distribution a -> Float
+d' :: Ord a => NDistribution a -> NDistribution a -> Float
 d' dist1 dist2 = abs (dist1 `ioc` dist1 - dist1 `ioc` dist2)
+
+-- | An 'NgramCount' is just an occurrence count of lists of characters.
+type NgramCount a = Distribution [a] Integer
+
+-- | Given @n@ and a text, compute the probability distribution of all @n@-grams
+-- in the text.
+ngrams :: Ord a => Int -> [a] -> NgramCount a
+ngrams n = getDist . mapMaybe (takeMaybe n) . tails
+
+takeMaybe :: Int -> [a] -> Maybe [a]
+takeMaybe n _ | n <= 0 = Just []
+takeMaybe _ []         = Nothing
+takeMaybe n (x:xs)     = (x:) <$> takeMaybe (n-1) xs
+
+-- | Take a function that operates on lists of @a@s, and apply it to all the
+-- tails of an input list.
+mapTails :: ([a] -> b) -> [a] -> [b]
+mapTails f as = map f (tails as)
+
+-- | Generate an 'NgramCount' from a file in the following format:
+--
+-- @
+-- <ngram> <count>
+-- <ngram> <count>
+-- ...
+-- @
+--
+-- where each <ngram> is a capitalized n-gram with alphabetical characters and
+-- each <count> is a positive integer.
+ngramsFromFile :: FilePath -> IO (NgramCount Alpha)
+ngramsFromFile path = do
+  lns <- lines <$> readFile path
+  let f ln = let [ngramStr, countStr] = splitOn " " ln
+             in (alphasFromString ngramStr, read countStr)
+  return $ Map.fromList (map f lns)
