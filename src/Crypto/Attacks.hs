@@ -13,11 +13,13 @@ module Crypto.Attacks
   , bruteForceWithDist
   , bruteForceEnglish
   , guessPolyAlphaKeyLength
+  , breakPoly
     -- * Scheme-specific attacks
-  , breakShiftCipher
-  , breakShiftCipherEnglish
-  , breakShiftCipherKnownPlaintext
-  , breakSubstCipher
+  , breakMonoAlphaShift
+  , breakMonoAlphaShiftEnglish
+  , breakMonoAlphaShiftKnownPlaintext
+  , breakPolyAlphaShiftEnglish
+  , breakMonoAlphaSubst
     -- * Handy distribution utilities
   , Distribution
   , getDist
@@ -31,7 +33,7 @@ import Crypto.Utils
 
 import Control.Monad.Random
 import Data.Bifunctor (second)
-import Data.List (nub, sortBy, sortOn, (\\), minimumBy)
+import Data.List (nub, sortBy, sortOn, (\\), minimumBy, transpose)
 import qualified Data.List.NonEmpty as LN
 import qualified Data.Map as Map
 import Data.Maybe (fromJust)
@@ -90,50 +92,69 @@ bruteForceEnglish :: [key] -- ^ list of keys to try
 bruteForceEnglish = bruteForceWithDist englishDist
 
 -- | Guess the key length given a ciphertext encoded using a poly-alphabetic
--- cipher, i.e. a cipher defined using 'polyCipher', assuming it was encoded in
--- English. The output is a list of 'Int's, sorted with the likeliest key length
--- at the head of the list, where each 'Int' is paired with the average distance
--- from English's frequency distribution. This should work regardless of the
--- underlying per-character cipher (since the underlying cipher is necessarily a
--- substitution).
+-- substitution cipher, i.e. a cipher defined using 'polyCipher', assuming it
+-- was encoded in English. The output is a list of 'Int's, sorted with the
+-- likeliest key length at the head of the list, where each 'Int' is paired with
+-- the average distance from English's frequency distribution. This should work
+-- regardless of the underlying per-character cipher (since the underlying
+-- cipher is necessarily a substitution).
 guessPolyAlphaKeyLength :: [Int]
                         -- ^ List of key lengths to try
                         -> [Alpha]
                         -> [(Int, Float)]
 guessPolyAlphaKeyLength keyLengths ciphertext =
   sortBy (comparing snd) $ zip keyLengths (map f keyLengths)
-  where f = avg . map (d englishDist . getDist) . flip nths ciphertext
+  where f = avg . map (d englishDist . getDist) . flip slices ciphertext
 
 -- | Given an attack on a scheme produced by 'monoCipher', lift it to an attack
+-- on a scheme produced by 'polyCipher' assuming we know the key length. Use in
+-- conjunction with 'guessPolyAlphaKeyLength'.
+breakPoly :: CiphertextOnlyAttack key [plainchar] [cipherchar]
+          -- ^ Attack on mono cipher
+          -> Int
+          -- ^ Key length of poly cipher
+          -> CiphertextOnlyAttack (LN.NonEmpty key) [plainchar] [cipherchar]
+breakPoly attack keyLength ciphertext =
+  let sliceAttacks = map attack (slices keyLength ciphertext)
+      orderedKeysWithSlices = sequencePreferred 26 keyLength sliceAttacks
+      combineKeysWithSlices keysWithSlices =
+        (LN.fromList (fst <$> keysWithSlices), unSlices (snd <$> keysWithSlices))
+      orderedAttacks = map combineKeysWithSlices orderedKeysWithSlices
+  in orderedAttacks
 
 -- | Brute-force, ciphertext-only attack on 'monoAlphaShiftCipher'.
-breakShiftCipher :: CiphertextOnlyAttack Int [Alpha] [Alpha]
-breakShiftCipher = bruteForce [0..25] monoAlphaShiftCipher
+breakMonoAlphaShift :: CiphertextOnlyAttack Int [Alpha] [Alpha]
+breakMonoAlphaShift = bruteForce [0..25] monoAlphaShiftCipher
 
 -- | Brute-force, English-biased ciphertext-only attack on 'monoAlphaShiftCipher'.
-breakShiftCipherEnglish :: CiphertextOnlyAttack Int [Alpha] [Alpha]
-breakShiftCipherEnglish = bruteForceEnglish [0..25] monoAlphaShiftCipher
+breakMonoAlphaShiftEnglish :: CiphertextOnlyAttack Int [Alpha] [Alpha]
+breakMonoAlphaShiftEnglish = bruteForceEnglish [0..25] monoAlphaShiftCipher
+
+-- | English-biased ciphertext-only attack on 'polyAlphaShiftCipher', given the
+-- key length of the cipher. Use in conjunciton with 'guessPolyAlphaKeyLength'.
+breakPolyAlphaShiftEnglish :: Int -> CiphertextOnlyAttack (LN.NonEmpty Int) [Alpha] [Alpha]
+breakPolyAlphaShiftEnglish = breakPoly breakMonoAlphaShiftEnglish
 
 -- | Known-plaintext attack on 'monoAlphaShiftCipher'. Assumes the input pairs are valid;
 -- does not check for this. If the input list contains only pairs of empty
 -- strings, this degenerates into a brute-force attack. Assuming any of the
 -- input pairs contain nonempty strings, this is guaranteed to be correct for
 -- any shift cipher, and only produces one result.
-breakShiftCipherKnownPlaintext :: KnownPlaintextAttack Int [Alpha] [Alpha]
-breakShiftCipherKnownPlaintext [] ciphertext = breakShiftCipher ciphertext
-breakShiftCipherKnownPlaintext (([],_):pairs) ciphertext =
-  breakShiftCipherKnownPlaintext pairs ciphertext
+breakMonoAlphaShiftKnownPlaintext :: KnownPlaintextAttack Int [Alpha] [Alpha]
+breakMonoAlphaShiftKnownPlaintext [] ciphertext = breakMonoAlphaShift ciphertext
+breakMonoAlphaShiftKnownPlaintext (([],_):pairs) ciphertext =
+  breakMonoAlphaShiftKnownPlaintext pairs ciphertext
 -- NB: The below case only happens if the input was invalid.
-breakShiftCipherKnownPlaintext ((_,[]):pairs) ciphertext =
-  breakShiftCipherKnownPlaintext pairs ciphertext
-breakShiftCipherKnownPlaintext ((p:ps,c:cs):_) ciphertext =
+breakMonoAlphaShiftKnownPlaintext ((_,[]):pairs) ciphertext =
+  breakMonoAlphaShiftKnownPlaintext pairs ciphertext
+breakMonoAlphaShiftKnownPlaintext ((p:ps,c:cs):_) ciphertext =
   let key = (fromEnum c - fromEnum p) `mod` 26
   in [(key, decrypt monoAlphaShiftCipher key ciphertext)]
 
--- | Attempts to break a substitution cipher given an expected distribution of
--- alphabetical characters.
-breakSubstCipher :: Distribution Alpha -> CiphertextOnlyAttack Permutation [Alpha] [Alpha]
-breakSubstCipher refDist ciphertext =
+-- | Attempts to break a mono-alphabetic substitution cipher given an expected
+-- distribution of alphabetical characters. Needs improvement.
+breakMonoAlphaSubst :: Distribution Alpha -> CiphertextOnlyAttack Permutation [Alpha] [Alpha]
+breakMonoAlphaSubst refDist ciphertext =
   let dist = getDist ciphertext
       distLetters' = fst <$> sortOn (Down . snd) (Map.toList dist)
       distLetters = distLetters' ++ ([A .. Z] \\ distLetters')
