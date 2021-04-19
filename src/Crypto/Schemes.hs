@@ -72,7 +72,7 @@ generateKey1 = flip generateKey 1
 -- @key@ type as the per-character scheme, and encrypts/decrypts by mapping the
 -- input scheme's 'encrypt' and 'decrypt' functions over the strings.
 mono :: PrivateKeyScheme key plainchar cipherchar
-           -> PrivateKeyScheme key [plainchar] [cipherchar]
+     -> PrivateKeyScheme key [plainchar] [cipherchar]
 mono s = PrivateKeyScheme
   { generateKey = generateKey s
   , encrypt = traverse . encrypt s
@@ -93,10 +93,10 @@ mono s = PrivateKeyScheme
 -- If the key length is non-positive, the key generation will throw a runtime
 -- error.
 poly :: PrivateKeyScheme key plaintext ciphertext
-               -> Int
-               -- ^ The security parameter to pass to the input scheme's
-               -- key generator.
-               -> PrivateKeyScheme (LN.NonEmpty key) [plaintext] [ciphertext]
+     -> Int
+     -- ^ The security parameter to pass to the input scheme's
+     -- key generator.
+     -> PrivateKeyScheme (LN.NonEmpty key) [plaintext] [ciphertext]
 poly s securityParam = PrivateKeyScheme
   { generateKey = \keyLength -> do
       ks <- replicateM keyLength (generateKey s securityParam)
