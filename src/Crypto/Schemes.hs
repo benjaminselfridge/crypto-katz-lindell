@@ -11,15 +11,15 @@ module Crypto.Schemes
   , PrivateKeyScheme(..)
   , generateKey1
     -- ** New schemes from old
-  , monoCipher
-  , polyCipher
+  , mono
+  , poly
     -- ** Example private key ciphers
-  , alphaShiftCipher
-  , monoAlphaShiftCipher
-  , polyAlphaShiftCipher
-  , alphaSubstCipher
-  , monoAlphaSubstCipher
-  , polyAlphaSubstCipher
+  , alphaShift
+  , monoAlphaShift
+  , polyAlphaShift
+  , alphaSubst
+  , monoAlphaSubst
+  , polyAlphaSubst
   , oneTimePad
   ) where
 
@@ -71,9 +71,9 @@ generateKey1 = flip generateKey 1
 -- that scheme to one that operates on strings. The new scheme uses the same
 -- @key@ type as the per-character scheme, and encrypts/decrypts by mapping the
 -- input scheme's 'encrypt' and 'decrypt' functions over the strings.
-monoCipher :: PrivateKeyScheme key plainchar cipherchar
+mono :: PrivateKeyScheme key plainchar cipherchar
            -> PrivateKeyScheme key [plainchar] [cipherchar]
-monoCipher s = PrivateKeyScheme
+mono s = PrivateKeyScheme
   { generateKey = generateKey s
   , encrypt = traverse . encrypt s
   , decrypt = map . decrypt s
@@ -92,12 +92,12 @@ monoCipher s = PrivateKeyScheme
 --
 -- If the key length is non-positive, the key generation will throw a runtime
 -- error.
-polyCipher :: PrivateKeyScheme key plaintext ciphertext
+poly :: PrivateKeyScheme key plaintext ciphertext
                -> Int
                -- ^ The security parameter to pass to the input scheme's
                -- key generator.
                -> PrivateKeyScheme (LN.NonEmpty key) [plaintext] [ciphertext]
-polyCipher s securityParam = PrivateKeyScheme
+poly s securityParam = PrivateKeyScheme
   { generateKey = \keyLength -> do
       ks <- replicateM keyLength (generateKey s securityParam)
       case LN.nonEmpty ks of
@@ -110,10 +110,10 @@ polyCipher s securityParam = PrivateKeyScheme
   where msg = "generateKey called with non-positive key length"
 
 -- | Shift cipher for single 'Alpha'. This is used to define
--- 'monoAlphaShiftCipher' and 'polyAlphaShiftCipher'. The key generator ignores
+-- 'monoAlphaShift' and 'polyAlphaShift'. The key generator ignores
 -- its input.
-alphaShiftCipher :: PrivateKeyScheme Int Alpha Alpha
-alphaShiftCipher = PrivateKeyScheme
+alphaShift :: PrivateKeyScheme Int Alpha Alpha
+alphaShift = PrivateKeyScheme
   { generateKey = const $ uniform [0 .. 25]
   , encrypt = \key -> return . shiftAlpha key
   , decrypt = shiftAlpha . negate
@@ -123,25 +123,25 @@ alphaShiftCipher = PrivateKeyScheme
 -- (inclusive), and we shift each character by that amount to encrypt.
 --
 -- @
--- monoAlphaShiftCipher == monoCipher alphaShiftCipher
+-- monoAlphaShift == mono alphaShift
 -- @
-monoAlphaShiftCipher :: PrivateKeyScheme Int [Alpha] [Alpha]
-monoAlphaShiftCipher = monoCipher alphaShiftCipher
+monoAlphaShift :: PrivateKeyScheme Int [Alpha] [Alpha]
+monoAlphaShift = mono alphaShift
 
 -- | Poly-alphabetic shift cipher, also known as Vigenère cipher. This promotes
--- the normal 'alphaShiftCipher' to operate on lists of keys.
+-- the normal 'alphaShift' to operate on lists of keys.
 --
 -- @
--- polyAlphaShiftCipher == polyCipher alphaShiftCipher undefined
+-- polyAlphaShift == poly alphaShift undefined
 -- @
-polyAlphaShiftCipher :: PrivateKeyScheme (LN.NonEmpty Int) [Alpha] [Alpha]
-polyAlphaShiftCipher = polyCipher alphaShiftCipher undefined
+polyAlphaShift :: PrivateKeyScheme (LN.NonEmpty Int) [Alpha] [Alpha]
+polyAlphaShift = poly alphaShift undefined
 
 -- | Substitution cipher for single 'Alpha'. This is used to define
--- 'monoAlphaSubstCipher' and 'polyAlphaSubstCipher'. The key generator ignores
+-- 'monoAlphaSubst' and 'polyAlphaSubst'. The key generator ignores
 -- its input.
-alphaSubstCipher :: PrivateKeyScheme Permutation Alpha Alpha
-alphaSubstCipher = PrivateKeyScheme
+alphaSubst :: PrivateKeyScheme Permutation Alpha Alpha
+alphaSubst = PrivateKeyScheme
   { generateKey = const $ fst . randomPermutation 26 . mkStdGen <$> getRandom
   , encrypt = \key -> return . permuteAlpha key
   , decrypt = permuteAlpha . inverse
@@ -152,19 +152,19 @@ alphaSubstCipher = PrivateKeyScheme
 -- encrypt.
 --
 -- @
--- monoAlphaSubstCipher == monoCipher alphaSubstCipher
+-- monoAlphaSubst == mono alphaSubst
 -- @
-monoAlphaSubstCipher :: PrivateKeyScheme Permutation [Alpha] [Alpha]
-monoAlphaSubstCipher = monoCipher alphaSubstCipher
+monoAlphaSubst :: PrivateKeyScheme Permutation [Alpha] [Alpha]
+monoAlphaSubst = mono alphaSubst
 
 -- | Poly-alphabetic substitution cipher. This promotes the normal
--- 'alphaSubstCipher' to operate on lists of keys.
+-- 'alphaSubst' to operate on lists of keys.
 --
 -- @
--- polyAlphaSubstCipher == polyCipher alphaSubstCipher undefined
+-- polyAlphaSubst == poly alphaSubst undefined
 -- @
-polyAlphaSubstCipher :: PrivateKeyScheme (LN.NonEmpty Permutation) [Alpha] [Alpha]
-polyAlphaSubstCipher = polyCipher alphaSubstCipher undefined
+polyAlphaSubst :: PrivateKeyScheme (LN.NonEmpty Permutation) [Alpha] [Alpha]
+polyAlphaSubst = poly alphaSubst undefined
 
 -- | One-time pad on bitvectors of a given length.
 oneTimePad :: BV.NatRepr w -> PrivateKeyScheme (BV.BV w) (BV.BV w) (BV.BV w)

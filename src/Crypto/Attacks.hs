@@ -84,7 +84,7 @@ bruteForceEnglish :: [key] -- ^ list of keys to try
 bruteForceEnglish = bruteForceWithDist englishDist
 
 -- | Guess the key length given a ciphertext encoded using a poly-alphabetic
--- substitution cipher, i.e. a cipher defined using 'polyCipher', assuming it
+-- substitution cipher, i.e. a cipher defined using 'poly', assuming it
 -- was encoded in English. The output is a list of 'Int's, sorted with the
 -- likeliest key length at the head of the list, where each 'Int' is paired with
 -- the average distance from English's frequency distribution. This should work
@@ -98,8 +98,8 @@ guessPolyAlphaKeyLength keyLengths ciphertext =
   sortBy (comparing snd) $ zip keyLengths (map f keyLengths)
   where f = avg . map (d englishDist . getDist) . flip slices ciphertext
 
--- | Given an attack on a scheme produced by 'monoCipher', lift it to an attack
--- on a scheme produced by 'polyCipher' assuming we know the key length. Use in
+-- | Given an attack on a scheme produced by 'mono', lift it to an attack
+-- on a scheme produced by 'poly' assuming we know the key length. Use in
 -- conjunction with 'guessPolyAlphaKeyLength'.
 breakPoly :: CiphertextOnlyAttack key [plainchar] [cipherchar]
           -- ^ Attack on mono cipher
@@ -114,20 +114,20 @@ breakPoly attack keyLength ciphertext =
       orderedAttacks = map combineKeysWithSlices orderedKeysWithSlices
   in orderedAttacks
 
--- | Brute-force, ciphertext-only attack on 'monoAlphaShiftCipher'.
+-- | Brute-force, ciphertext-only attack on 'monoAlphaShift'.
 breakMonoAlphaShift :: CiphertextOnlyAttack Int [Alpha] [Alpha]
-breakMonoAlphaShift = bruteForce [0..25] monoAlphaShiftCipher
+breakMonoAlphaShift = bruteForce [0..25] monoAlphaShift
 
--- | Brute-force, English-biased ciphertext-only attack on 'monoAlphaShiftCipher'.
+-- | Brute-force, English-biased ciphertext-only attack on 'monoAlphaShift'.
 breakMonoAlphaShiftEnglish :: CiphertextOnlyAttack Int [Alpha] [Alpha]
-breakMonoAlphaShiftEnglish = bruteForceEnglish [0..25] monoAlphaShiftCipher
+breakMonoAlphaShiftEnglish = bruteForceEnglish [0..25] monoAlphaShift
 
 -- | English-biased ciphertext-only attack on 'polyAlphaShiftCipher', given the
 -- key length of the cipher. Use in conjunciton with 'guessPolyAlphaKeyLength'.
 breakPolyAlphaShiftEnglish :: Int -> CiphertextOnlyAttack (LN.NonEmpty Int) [Alpha] [Alpha]
 breakPolyAlphaShiftEnglish = breakPoly breakMonoAlphaShiftEnglish
 
--- | Known-plaintext attack on 'monoAlphaShiftCipher'. Assumes the input pairs are valid;
+-- | Known-plaintext attack on 'monoAlphaShift'. Assumes the input pairs are valid;
 -- does not check for this. If the input list contains only pairs of empty
 -- strings, this degenerates into a brute-force attack. Assuming any of the
 -- input pairs contain nonempty strings, this is guaranteed to be correct for
@@ -141,7 +141,7 @@ breakMonoAlphaShiftKnownPlaintext ((_,[]):pairs) ciphertext =
   breakMonoAlphaShiftKnownPlaintext pairs ciphertext
 breakMonoAlphaShiftKnownPlaintext ((p:ps,c:cs):_) ciphertext =
   let key = (fromEnum c - fromEnum p) `mod` 26
-  in [(key, decrypt monoAlphaShiftCipher key ciphertext)]
+  in [(key, decrypt monoAlphaShift key ciphertext)]
 
 -- | Attempts to break a mono-alphabetic substitution cipher given an expected
 -- distribution of alphabetical characters. Needs improvement.
@@ -155,4 +155,4 @@ breakMonoAlphaSubst refDist ciphertext =
       pairs = zip refLetters distLetters
       sigma = toPermutation $
         map (\a -> 1 + fromEnum (fromJust (lookup a pairs))) [A .. Z]
-  in [(sigma, decrypt monoAlphaSubstCipher sigma ciphertext)]
+  in [(sigma, decrypt monoAlphaSubst sigma ciphertext)]
