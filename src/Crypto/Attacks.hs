@@ -20,11 +20,6 @@ module Crypto.Attacks
   , breakMonoAlphaShiftKnownPlaintext
   , breakPolyAlphaShiftEnglish
   , breakMonoAlphaSubst
-    -- * Handy distribution utilities
-  , Distribution
-  , getDist
-  , englishDist
-  , dotDist
   ) where
 
 import Crypto.Schemes
@@ -79,10 +74,7 @@ bruteForceWithDist :: Ord plainchar
                    -> CiphertextOnlyAttack key [plainchar] ciphertext
 bruteForceWithDist refDist s keys ciphertext =
   let pairs = bruteForce s keys ciphertext
-      rDot = refDist `dotDist` refDist
-      o (k, p) (k', p') = abs ( rDot - getDist p  `dotDist` refDist) `compare`
-                          abs ( rDot - getDist p' `dotDist` refDist)
-  in sortBy o pairs
+  in sortBy (comparing (d' refDist . getDist . snd)) pairs
 
 -- | A brute-force attack where @plaintext ~ [Alpha]@, sorted by closeness to
 -- English's letter distribution.
@@ -164,57 +156,3 @@ breakMonoAlphaSubst refDist ciphertext =
       sigma = toPermutation $
         map (\a -> 1 + fromEnum (fromJust (lookup a pairs))) [A .. Z]
   in [(sigma, decrypt monoAlphaSubstCipher sigma ciphertext)]
-
--- | A distribution of @a@s is a list of the probability of their occurrence in
--- a given piece of plaintext.
-type Distribution a = Map.Map a Float
-
--- | Compute a 'Distribution' from an input list.
-getDist :: Ord a => [a] -> Distribution a
-getDist as =
-  let counts = foldr (flip (Map.insertWith (+)) 1.0) Map.empty as
-      totalCount = length as
-  in fmap (/ fromIntegral totalCount) counts
-
--- | Average letter frequencies for English-language text, as given in
--- Katz/Lindell page 13, Figure 1.2.
-englishDist :: Distribution Alpha
-englishDist = Map.fromList
-  [ (A, 0.082)
-  , (B, 0.015)
-  , (C, 0.028)
-  , (D, 0.042)
-  , (E, 0.127)
-  , (F, 0.022)
-  , (G, 0.020)
-  , (H, 0.061)
-  , (I, 0.070)
-  , (J, 0.001)
-  , (K, 0.008)
-  , (L, 0.040)
-  , (M, 0.024)
-  , (N, 0.067)
-  , (O, 0.075)
-  , (P, 0.019)
-  , (Q, 0.001)
-  , (R, 0.060)
-  , (S, 0.063)
-  , (T, 0.090)
-  , (U, 0.028)
-  , (V, 0.010)
-  , (W, 0.024)
-  , (X, 0.020)
-  , (Y, 0.001)
-  , (Z, 0.001)
-  ]
-
--- | Computes @Sum p_i*q_i@, where @i@ indexes the @a@ type, and @p_i@, @q_i@
--- are the probabilities at @i@ of the two input distributions.
-dotDist :: Ord a => Distribution a -> Distribution a -> Float
-dotDist d1 d2 =
-  let as = nub (Map.keys d1 ++ Map.keys d2)
-  in sum $ map (\a -> Map.findWithDefault 0.0 a d1 * Map.findWithDefault 0.0 a d2) as
-
--- | The distance between two distributions.
-d :: Ord a => Distribution a -> Distribution a -> Float
-d dist1 dist2 = abs (dist1 `dotDist` dist1 - dist2 `dotDist` dist2)
