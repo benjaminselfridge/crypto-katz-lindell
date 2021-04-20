@@ -6,7 +6,9 @@ module Main where
 
 import Crypto.Schemes
 
+import Control.Category
 import qualified Data.BitVector.Sized as BV
+import Data.Invertible.Bijection
 import Data.Parameterized.NatRepr
 import GHC.TypeNats
 import Test.QuickCheck
@@ -14,14 +16,19 @@ import Test.QuickCheck.Monadic
 import Test.Tasty
 import Test.Tasty.QuickCheck
 
+import Prelude hiding (id, (.))
+
 newtype KeyLength = KeyLength Int
   deriving (Eq, Show)
 
 instance Arbitrary KeyLength where
   arbitrary = KeyLength <$> chooseInt (1, 20)
 
-instance KnownNat w => Arbitrary (BV.BV w) where
-  arbitrary = BV.mkBV knownNat <$>
+newtype ABV w = ABV { unABV :: BV.BV w }
+  deriving (Show, Eq)
+
+instance KnownNat w => Arbitrary (ABV w) where
+  arbitrary = ABV . BV.mkBV knownNat <$>
     choose (0, maxUnsigned (knownNat :: NatRepr w))
 
 prop_encryptDecrypt :: Eq plaintext
@@ -51,7 +58,8 @@ tests = testGroup "Encrypt/Decrypt"
   , testProperty "poly-alphabetic substitution" $
     prop_encryptDecrypt polyAlphaSubst
   , testProperty "one-time pad" $
-    prop_encryptDecrypt (oneTimePad (knownNat @32))
+    prop_encryptDecrypt $
+    iso id (ABV :<->: unABV) id (oneTimePad (knownNat @32))
   ]
 
 main :: IO ()

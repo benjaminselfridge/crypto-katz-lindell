@@ -1,5 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators #-}
 
 -- | Types for, and examples of, encryption schemes found in Katz/Lindell.
 module Crypto.Schemes
@@ -11,6 +12,7 @@ module Crypto.Schemes
   , PrivateKeyScheme(..)
   , generateKey'
     -- ** New schemes from old
+  , iso
   , mono
   , poly
     -- ** Example private key ciphers
@@ -29,6 +31,7 @@ import Control.Monad (zipWithM)
 import Control.Monad.Random
 import qualified Data.BitVector.Sized as BV
 import Data.Foldable (toList)
+import Data.Invertible.Bijection
 import qualified Data.List.NonEmpty as LN
 import Data.Maybe (fromJust)
 import Math.Combinat.Permutations
@@ -66,6 +69,21 @@ data PrivateKeyScheme key plaintext ciphertext = PrivateKeyScheme
 generateKey' :: forall key plaintext ciphertext m . MonadRandom m
              => PrivateKeyScheme key plaintext ciphertext -> m key
 generateKey' = flip generateKey undefined
+
+-- | Generate a 'PrivateKeyScheme' that is isomorphic to another one by supplying
+-- bijections between the key, plaintext, and ciphertext types.
+iso :: (key <-> key')
+    -> (plaintext <-> plaintext')
+    -> (ciphertext <-> ciphertext')
+    -> PrivateKeyScheme key plaintext ciphertext
+    -> PrivateKeyScheme key' plaintext' ciphertext'
+iso kb pb cb s = PrivateKeyScheme
+  { generateKey = \n -> biTo kb <$> generateKey s n
+  , encrypt = \key' plaintext' ->
+      biTo cb <$> encrypt s (biFrom kb key') (biFrom pb plaintext')
+  , decrypt = \key' ciphertext' ->
+      biTo pb $ decrypt s (biFrom kb key') (biFrom cb ciphertext')
+  }
 
 -- | Given a 'PrivateKeyScheme' that operates on individual characters, lift
 -- that scheme to one that operates on strings. The new scheme uses the same
