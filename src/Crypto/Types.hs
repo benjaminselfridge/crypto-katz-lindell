@@ -58,7 +58,7 @@ alphaFromChar 'W' = Just W
 alphaFromChar 'X' = Just X
 alphaFromChar 'Y' = Just Y
 alphaFromChar 'Z' = Just Z
-alphaFromChar c = Nothing
+alphaFromChar _ = Nothing
 
 -- | Convert an 'Alpha' to a 'Char'.
 alphaToChar :: Alpha -> Char

@@ -7,8 +7,8 @@ module Main where
 import Crypto.Schemes
 
 import Control.Category
+import Control.Lens (prism')
 import qualified Data.BitVector.Sized as BV
-import Data.Invertible.Bijection
 import Data.Parameterized.NatRepr
 import GHC.TypeNats
 import Test.QuickCheck
@@ -59,7 +59,7 @@ tests = testGroup "Encrypt/Decrypt"
     prop_encryptDecrypt polyAlphaSubst
   , testProperty "one-time pad" $
     prop_encryptDecrypt $
-    iso id (ABV :<->: unABV) id (oneTimePad (knownNat @32))
+    iso id (prism' unABV (Just . ABV)) id (oneTimePad (knownNat @32))
   ]
 
 main :: IO ()

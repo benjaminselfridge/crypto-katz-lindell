@@ -25,9 +25,7 @@ import Data.List (transpose, permutations, nub, tails)
 import Data.List.Split (chunksOf, splitOn)
 import qualified Data.Map as Map
 import Data.Maybe (mapMaybe)
-import Data.Traversable (forM)
 import Math.Combinat.Compositions
-import System.IO
 
 -- | 'slices' splits a list into @n@ pieces. The pieces are constructed by
 -- taking every @n+k@th element of the list, where @k@ ranges from @0@ to @n-1@.
@@ -81,6 +79,7 @@ sequencePreferred numRows numCols as =
 -- numeric type @b@.
 type Distribution a b = Map.Map a b
 
+-- | Create a simple 'Distribution' by counting occurrences.
 getDist :: Ord a => [a] -> Distribution a Integer
 getDist as = foldr (flip (Map.insertWith (+)) 1) Map.empty as
 
@@ -159,11 +158,6 @@ takeMaybe :: Int -> [a] -> Maybe [a]
 takeMaybe n _ | n <= 0 = Just []
 takeMaybe _ []         = Nothing
 takeMaybe n (x:xs)     = (x:) <$> takeMaybe (n-1) xs
-
--- | Take a function that operates on lists of @a@s, and apply it to all the
--- tails of an input list.
-mapTails :: ([a] -> b) -> [a] -> [b]
-mapTails f as = map f (tails as)
 
 -- | Generate an 'NgramCount' from a file in the following format:
 --

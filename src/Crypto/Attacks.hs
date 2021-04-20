@@ -26,9 +26,7 @@ import Crypto.Schemes
 import Crypto.Types
 import Crypto.Utils
 
-import Control.Monad.Random
-import Data.Bifunctor (second)
-import Data.List (nub, sortBy, sortOn, (\\), minimumBy, transpose)
+import Data.List (sortBy, sortOn, (\\))
 import qualified Data.List.NonEmpty as LN
 import qualified Data.Map as Map
 import Data.Maybe (fromJust)
@@ -122,7 +120,7 @@ breakMonoAlphaShift = bruteForce [0..25] monoAlphaShift
 breakMonoAlphaShiftEnglish :: CiphertextOnlyAttack Int [Alpha] [Alpha]
 breakMonoAlphaShiftEnglish = bruteForceEnglish [0..25] monoAlphaShift
 
--- | English-biased ciphertext-only attack on 'polyAlphaShiftCipher', given the
+-- | English-biased ciphertext-only attack on 'polyAlphaShift', given the
 -- key length of the cipher. Use in conjunciton with 'guessPolyAlphaKeyLength'.
 breakPolyAlphaShiftEnglish :: Int -> CiphertextOnlyAttack (LN.NonEmpty Int) [Alpha] [Alpha]
 breakPolyAlphaShiftEnglish = breakPoly breakMonoAlphaShiftEnglish
@@ -133,7 +131,7 @@ breakPolyAlphaShiftEnglish = breakPoly breakMonoAlphaShiftEnglish
 -- input pairs contain nonempty strings, this is guaranteed to be correct for
 -- any shift cipher, and only produces one result.
 breakMonoAlphaShiftKnownPlaintext :: KnownPlaintextAttack Int [Alpha] [Alpha]
-breakMonoAlphaShiftKnownPlaintext ((p:ps,c:cs):_) ciphertext =
+breakMonoAlphaShiftKnownPlaintext ((p:_,c:_):_) ciphertext =
   let key = (fromEnum c - fromEnum p) `mod` 26
   in [(key, decrypt monoAlphaShift key ciphertext)]
 breakMonoAlphaShiftKnownPlaintext (_:pairs) ciphertext =

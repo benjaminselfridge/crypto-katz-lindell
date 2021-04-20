@@ -38,12 +38,13 @@ library
                       bv-sized,
                       combinat,
                       containers,
-                      invertible,
+                      lens,
                       MonadRandom,
                       QuickCheck,
                       split,
     hs-source-dirs:   src
     default-language: Haskell2010
+    ghc-options:      -Wall
 
 test-suite test-encrypt-decrypt
     type:             exitcode-stdio-1.0
@@ -52,7 +53,7 @@ test-suite test-encrypt-decrypt
     build-depends:    base,
                       bv-sized,
                       crypto-katz-lindell,
-                      invertible,
+                      lens,
                       parameterized-utils,
                       QuickCheck,
                       tasty,

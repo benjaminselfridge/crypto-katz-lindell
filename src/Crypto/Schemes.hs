@@ -27,11 +27,10 @@ module Crypto.Schemes
 
 import Crypto.Types
 
-import Control.Monad (zipWithM)
+import Control.Lens (Iso', Prism', from, (^.), re, (^?))
 import Control.Monad.Random
 import qualified Data.BitVector.Sized as BV
 import Data.Foldable (toList)
-import Data.Invertible.Bijection
 import qualified Data.List.NonEmpty as LN
 import Data.Maybe (fromJust)
 import Math.Combinat.Permutations
@@ -70,19 +69,31 @@ generateKey' :: forall key plaintext ciphertext m . MonadRandom m
              => PrivateKeyScheme key plaintext ciphertext -> m key
 generateKey' = flip generateKey undefined
 
--- | Generate a 'PrivateKeyScheme' that is isomorphic to another one by supplying
--- bijections between the key, plaintext, and ciphertext types.
-iso :: (key <-> key')
-    -> (plaintext <-> plaintext')
-    -> (ciphertext <-> ciphertext')
+-- | Generate a 'PrivateKeyScheme' from an existing scheme by supplying
+-- bidirectional mappings between the @key@, @plaintext@, and @ciphertext@
+-- types. bijections between the key, plaintext, and ciphertext types.
+--
+-- Note the argument types:
+-- * @Iso' key key'@, an isomorphism between @key@ and @key'@
+-- * @Prism' plaintext plaintext'@, a reversible injective embedding of
+--   @plaintext'@ into @plaintext@
+-- * @Prism' ciphertext' ciphertext@, a reversible injective embedding of
+--   @ciphertext@ into @ciphertext'
+iso :: Iso' key key'
+    -> Prism' plaintext plaintext'
+    -> Prism' ciphertext' ciphertext
     -> PrivateKeyScheme key plaintext ciphertext
     -> PrivateKeyScheme key' plaintext' ciphertext'
-iso kb pb cb s = PrivateKeyScheme
-  { generateKey = \n -> biTo kb <$> generateKey s n
-  , encrypt = \key' plaintext' ->
-      biTo cb <$> encrypt s (biFrom kb key') (biFrom pb plaintext')
+iso kl pl cl s = PrivateKeyScheme
+  { generateKey = \n -> do
+      key <- generateKey s n
+      return $ key ^. kl
+  , encrypt = \key' plaintext' -> do
+      ciphertext <- encrypt s (key' ^. from kl) (plaintext' ^. re pl)
+      return $ ciphertext ^. re cl
   , decrypt = \key' ciphertext' ->
-      biTo pb $ decrypt s (biFrom kb key') (biFrom cb ciphertext')
+      let plaintext = decrypt s (key' ^. from kl) (fromJust $ ciphertext' ^? cl)
+      in fromJust $ plaintext ^? pl
   }
 
 -- | Given a 'PrivateKeyScheme' that operates on individual characters, lift
