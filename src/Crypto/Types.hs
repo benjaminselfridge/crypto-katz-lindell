@@ -17,6 +17,7 @@ import Data.Array.IArray ((!))
 import Data.Char (toUpper)
 import Data.Maybe (mapMaybe)
 import Math.Combinat.Permutations
+import Test.QuickCheck
 
 -- | Alphabetical character, for schemes that only use letters.
 data Alpha = A | B | C | D | E | F | G | H
@@ -24,6 +25,9 @@ data Alpha = A | B | C | D | E | F | G | H
            | Q | R | S | T | U | V | W | X
            | Y | Z
   deriving (Show, Eq, Ord, Enum)
+
+instance Arbitrary Alpha where
+  arbitrary = chooseEnum (A, Z)
 
 -- | Convert a 'Char' to an 'Alpha'. Throw error if the input is not one of the
 -- 26 uppercase letters.

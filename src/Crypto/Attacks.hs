@@ -133,15 +133,12 @@ breakPolyAlphaShiftEnglish = breakPoly breakMonoAlphaShiftEnglish
 -- input pairs contain nonempty strings, this is guaranteed to be correct for
 -- any shift cipher, and only produces one result.
 breakMonoAlphaShiftKnownPlaintext :: KnownPlaintextAttack Int [Alpha] [Alpha]
-breakMonoAlphaShiftKnownPlaintext [] ciphertext = breakMonoAlphaShift ciphertext
-breakMonoAlphaShiftKnownPlaintext (([],_):pairs) ciphertext =
-  breakMonoAlphaShiftKnownPlaintext pairs ciphertext
--- NB: The below case only happens if the input was invalid.
-breakMonoAlphaShiftKnownPlaintext ((_,[]):pairs) ciphertext =
-  breakMonoAlphaShiftKnownPlaintext pairs ciphertext
 breakMonoAlphaShiftKnownPlaintext ((p:ps,c:cs):_) ciphertext =
   let key = (fromEnum c - fromEnum p) `mod` 26
   in [(key, decrypt monoAlphaShift key ciphertext)]
+breakMonoAlphaShiftKnownPlaintext (_:pairs) ciphertext =
+  breakMonoAlphaShiftKnownPlaintext pairs ciphertext
+breakMonoAlphaShiftKnownPlaintext [] ciphertext = breakMonoAlphaShift ciphertext
 
 -- | Attempts to break a mono-alphabetic substitution cipher given an expected
 -- distribution of alphabetical characters. Needs improvement.

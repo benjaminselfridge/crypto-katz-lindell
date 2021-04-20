@@ -9,7 +9,7 @@ module Crypto.Schemes
     -- * Private key encryption
     -- ** Private key encryption schemes
   , PrivateKeyScheme(..)
-  , generateKey1
+  , generateKey'
     -- ** New schemes from old
   , mono
   , poly
@@ -60,12 +60,12 @@ data PrivateKeyScheme key plaintext ciphertext = PrivateKeyScheme
     -- ^ Decrypt plaintext with a given key.
   }
 
--- | Generate a key with a security parameter of @1@. This is mostly useful for
+-- | Generate a key with a security parameter of @undefined@. This is useful for
 -- schemes that are known to ignore the security parameter (like a basic shift
 -- or substitution cipher).
-generateKey1 :: forall key plaintext ciphertext m . MonadRandom m
+generateKey' :: forall key plaintext ciphertext m . MonadRandom m
              => PrivateKeyScheme key plaintext ciphertext -> m key
-generateKey1 = flip generateKey 1
+generateKey' = flip generateKey undefined
 
 -- | Given a 'PrivateKeyScheme' that operates on individual characters, lift
 -- that scheme to one that operates on strings. The new scheme uses the same
