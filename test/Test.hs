@@ -59,7 +59,7 @@ tests = testGroup "Encrypt/Decrypt"
     prop_encryptDecrypt polyAlphaSubst
   , testProperty "one-time pad" $
     prop_encryptDecrypt $
-    iso id (prism' unABV (Just . ABV)) id (oneTimePad (knownNat @32))
+    trans id (prism' unABV (Just . ABV)) id (oneTimePad (knownNat @32))
   ]
 
 main :: IO ()

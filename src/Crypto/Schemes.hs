@@ -12,7 +12,7 @@ module Crypto.Schemes
   , PrivateKeyScheme(..)
   , generateKey'
     -- ** New schemes from old
-  , iso
+  , trans
   , mono
   , poly
     -- ** Example private key ciphers
@@ -90,15 +90,15 @@ generateKey' = flip generateKey undefined
 -- @
 -- decrypt s' key' (encrypt s' key' p') == return p'.
 -- @
-iso :: Iso' key key'
-    -- ^ bijection @key \<-\> key'@
-    -> Prism' plaintext plaintext'
-    -- ^ embedding @plaintext' -\> plaintext@
-    -> Prism' ciphertext' ciphertext
-    -- ^ embedding @ciphertext -\> ciphertext'@
-    -> PrivateKeyScheme key plaintext ciphertext
-    -> PrivateKeyScheme key' plaintext' ciphertext'
-iso kl pl cl s = PrivateKeyScheme
+trans :: Iso' key key'
+      -- ^ bijection @key \<-\> key'@
+      -> Prism' plaintext plaintext'
+      -- ^ embedding @plaintext' -\> plaintext@
+      -> Prism' ciphertext' ciphertext
+      -- ^ embedding @ciphertext -\> ciphertext'@
+      -> PrivateKeyScheme key plaintext ciphertext
+      -> PrivateKeyScheme key' plaintext' ciphertext'
+trans kl pl cl s = PrivateKeyScheme
   { generateKey = \n -> do
       key <- generateKey s n
       return $ key ^. kl
