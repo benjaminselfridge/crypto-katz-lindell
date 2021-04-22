@@ -111,6 +111,9 @@ trans nl kl pl cl s = PrivateKeyScheme
       ciphertext <- encrypt s (key' ^. from kl) (plaintext' ^. re pl)
       return $ ciphertext ^. re cl
   , decrypt = \key' ciphertext' ->
+      -- NB: The use is ^?! is justified by the prism laws. Decryption is only
+      -- guaranteed to work for encrypted plaintexts, and the prism laws give us
+      -- exactly that.
       let plaintext = decrypt s (key' ^. from kl) (ciphertext' ^?! cl)
       in plaintext ^?! pl
   }
