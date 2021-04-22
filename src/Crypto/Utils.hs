@@ -4,6 +4,7 @@ module Crypto.Utils
   , unSlices
   , avg
   , sequencePreferred
+  , rotate
   -- * Distributions and related functions
   , Distribution
   , getDist
@@ -74,6 +75,12 @@ sequencePreferred :: Int -> Int -> [[a]] -> [[a]]
 sequencePreferred numRows numCols as =
   let ixss = indices numRows numCols
   in map (zipWith (!!) as) ixss
+
+-- | Rotate a list by an 'Int', which can be negative, positive, or zero.
+-- Negative 'Int's shift left, and positive 'Int's shift right.
+rotate :: Int -> [a] -> [a]
+rotate i as = take l . drop (i `mod` l) . cycle $ as
+  where l = length as
 
 -- | A distribution of @a@s is a occurrence map, assigning each @a@ to some
 -- numeric type @b@.

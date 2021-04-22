@@ -160,7 +160,9 @@ module Crypto.Schemes
     -- ** Private key encryption schemes
   , PrivateKeyScheme(..)
   , generateKey'
-    -- ** New schemes from old
+    -- ** Scheme combinators
+  , substFromAction, substFromList
+  , shiftFromAction, shiftFromList
   , trans, transN, transKey, transPlaintext, transCiphertext
   , compose
   , mono
@@ -176,8 +178,10 @@ module Crypto.Schemes
   ) where
 
 import Crypto.Types
+import Crypto.Utils
 
 import Control.Lens (Iso', Prism', from, (^.), re, (^?!))
+import Data.Maybe (fromJust)
 import Control.Monad.Random
 import qualified Data.BitVector.Sized as BV
 import Data.Foldable (toList)
@@ -200,7 +204,7 @@ type DecryptFn plaintext ciphertext = ciphertext -> plaintext
 -- messages @p@:
 --
 -- @
---   decrypt s k (encrypt s k p) == return p
+--   decrypt s k \<$\> encrypt s k p == return p
 -- @
 data PrivateKeyScheme n key plaintext ciphertext = PrivateKeyScheme
   { generateKey :: forall m . MonadRandom m => n -> m key
@@ -219,6 +223,55 @@ generateKey' :: forall key plaintext ciphertext m . MonadRandom m
              -- ^
              -> m key
 generateKey' = flip generateKey ()
+
+-- | Build a simple shift cipher given a way to apply a shift int to the text.
+shiftFromAction :: Int
+                -- ^ The number of elements of @t@.
+                -> (Int -> t -> t)
+                -- ^ The shifting function @f@. This must satisfy @f (-i) (f i t) == t@
+                -- for all @t@.
+                -> PrivateKeyScheme () Int t t
+shiftFromAction i f = PrivateKeyScheme
+  { generateKey = const $ uniform [0 .. i-1]
+  , encrypt = \key -> return . f key
+  , decrypt = f . negate
+  }
+
+-- | Build a simple shift cipher given the universe of text. Encrypting every
+-- message is linear in the size of the universe.
+shiftFromList :: Eq t
+              => [t]
+              -- ^ The entire (finite) universe of @t@, in order.
+              -> PrivateKeyScheme () Int t t
+shiftFromList u = shiftFromAction (length u) $ \key p ->
+  fromJust $ lookup p $ zip u (rotate key u)
+
+-- | Build a simple substitution cipher given a way to apply a permutation to
+-- the text. Encrypting every message takes as long as the permutation action
+-- supplied.
+substFromAction :: Int
+                -- ^ The number of elements of @t@.
+                -> (Permutation -> t -> t)
+                -- ^ A method for applying a permutation to the text. This
+                -- should expect permutations on the number of elements supplied
+                -- as the first argument to this function. Mathematically, this
+                -- must be a group action on the set @t@ to get a valid
+                -- substitution cipher.
+                -> PrivateKeyScheme () Permutation t t
+substFromAction n apply = PrivateKeyScheme
+  { generateKey = const $ fst . randomPermutation n . mkStdGen <$> getRandom
+  , encrypt = \key -> return . apply key
+  , decrypt = \key -> apply (inverse key)
+  }
+
+-- | Build a simple substitution cipher given the universe of text. Encrypting
+-- every message is linear in the size of the universe.
+substFromList :: Eq t
+              => [t]
+              -- ^ The entire (finite) universe of @t@, in order.
+              -> PrivateKeyScheme () Permutation t t
+substFromList u = substFromAction (length u) $ \key p ->
+  fromJust $ lookup p $ zip u (permuteList key u)
 
 -- | Generate a 'PrivateKeyScheme' from an existing scheme by supplying
 -- bidirectional mappings between the @key@, @plaintext@, and @ciphertext@
@@ -261,11 +314,7 @@ trans nl kl pl cl s = PrivateKeyScheme
       ciphertext <- encrypt s (key' ^. from kl) (plaintext' ^. re pl)
       return $ ciphertext ^. re cl
   , decrypt = \key' ciphertext' ->
-      -- NB: The use is ^?! is justified by the prism laws. Decryption is only
-      -- guaranteed to work for encrypted plaintexts, and the prism laws give us
-      -- exactly that.
-      let plaintext = decrypt s (key' ^. from kl) (ciphertext' ^?! cl)
-      in plaintext ^?! pl
+      (decrypt s (key' ^. from kl) (ciphertext' ^?! cl)) ^?! pl
   }
 
 -- | 'trans' but only for the security parameter @n@.
@@ -348,11 +397,7 @@ poly s = PrivateKeyScheme
 -- 'monoAlphaShift' and 'polyAlphaShift'. The key generator ignores
 -- its input.
 alphaShift :: PrivateKeyScheme () Int Alpha Alpha
-alphaShift = PrivateKeyScheme
-  { generateKey = const $ uniform [0 .. 25]
-  , encrypt = \key -> return . shiftAlpha key
-  , decrypt = shiftAlpha . negate
-  }
+alphaShift = shiftFromAction 26 shiftAlpha
 
 -- | Mono-alphabetic shift cipher. The key is an 'Int' between 0 and 25
 -- (inclusive), and we shift each character by that amount to encrypt.
@@ -376,11 +421,7 @@ polyAlphaShift = transN (,()) $ poly alphaShift
 -- 'monoAlphaSubst' and 'polyAlphaSubst'. The key generator ignores
 -- its input.
 alphaSubst :: PrivateKeyScheme () Permutation Alpha Alpha
-alphaSubst = PrivateKeyScheme
-  { generateKey = const $ fst . randomPermutation 26 . mkStdGen <$> getRandom
-  , encrypt = \key -> return . permuteAlpha key
-  , decrypt = permuteAlpha . inverse
-  }
+alphaSubst = substFromAction 26 permuteAlpha
 
 -- | Mono-alphabetic substitution cipher. The key is a 'Permutation' of the
 -- alphabet, and we apply the permutation to each character in the input to
