@@ -59,7 +59,7 @@ type ChosenCiphertextAttack key plaintext ciphertext =
 -- list, and give a list of all the results along with the @key@s used to
 -- generate them.
 bruteForce :: [key] -- ^ list of keys to try
-           -> PrivateKeyScheme key plaintext ciphertext
+           -> PrivateKeyScheme n key plaintext ciphertext
            -> CiphertextOnlyAttack key plaintext ciphertext
 bruteForce keys s ciphertext = zip keys (flip (decrypt s) ciphertext <$> keys)
 
@@ -68,7 +68,7 @@ bruteForce keys s ciphertext = zip keys (flip (decrypt s) ciphertext <$> keys)
 bruteForceWithDist :: Ord plainchar
                    => NDistribution plainchar -- ^ reference distribution
                    -> [key] -- ^ list of keys to try
-                   -> PrivateKeyScheme key [plainchar] ciphertext
+                   -> PrivateKeyScheme n key [plainchar] ciphertext
                    -> CiphertextOnlyAttack key [plainchar] ciphertext
 bruteForceWithDist refDist s keys ciphertext =
   let pairs = bruteForce s keys ciphertext
@@ -77,7 +77,7 @@ bruteForceWithDist refDist s keys ciphertext =
 -- | A brute-force attack where @plaintext ~ [Alpha]@, sorted by closeness to
 -- English's letter distribution.
 bruteForceEnglish :: [key] -- ^ list of keys to try
-                  -> PrivateKeyScheme key [Alpha] ciphertext
+                  -> PrivateKeyScheme n key [Alpha] ciphertext
                   -> CiphertextOnlyAttack key [Alpha] ciphertext
 bruteForceEnglish = bruteForceWithDist englishDist
 

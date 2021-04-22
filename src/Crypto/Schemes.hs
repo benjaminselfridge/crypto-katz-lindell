@@ -1,5 +1,7 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeOperators #-}
 
 -- | Types for, and examples of, encryption schemes found in Katz/Lindell.
@@ -13,6 +15,7 @@ module Crypto.Schemes
   , generateKey'
     -- ** New schemes from old
   , trans
+  , compose
   , mono
   , poly
     -- ** Example private key ciphers
@@ -53,8 +56,8 @@ type DecryptFn plaintext ciphertext = ciphertext -> plaintext
 -- @
 --   decrypt s k (encrypt s k p) == return p
 -- @
-data PrivateKeyScheme key plaintext ciphertext = PrivateKeyScheme
-  { generateKey :: forall m . MonadRandom m => Int -> m key
+data PrivateKeyScheme n key plaintext ciphertext = PrivateKeyScheme
+  { generateKey :: forall m . MonadRandom m => n -> m key
     -- ^ Generate a random key from a given security parameter ('Int').
   , encrypt :: key -> EncryptFn plaintext ciphertext
     -- ^ Encrypt plaintext with a given key.
@@ -62,18 +65,20 @@ data PrivateKeyScheme key plaintext ciphertext = PrivateKeyScheme
     -- ^ Decrypt plaintext with a given key.
   }
 
--- | Generate a key with a security parameter of @undefined@. This is useful for
--- schemes that are known to ignore the security parameter (like a basic shift
--- or substitution cipher).
+-- | Generate a key with a security parameter of @()@. This is useful for
+-- schemes that ignore the security parameter (like a basic shift or
+-- substitution cipher).
 generateKey' :: forall key plaintext ciphertext m . MonadRandom m
-             => PrivateKeyScheme key plaintext ciphertext -> m key
-generateKey' = flip generateKey undefined
+             => PrivateKeyScheme () key plaintext ciphertext -> m key
+generateKey' = flip generateKey ()
 
 -- | Generate a 'PrivateKeyScheme' from an existing scheme by supplying
 -- bidirectional mappings between the @key@, @plaintext@, and @ciphertext@
 -- types.
 --
 -- Note the argument types:
+--
+--   * @Prism' n n'@, a reversible injective embedding of @n'@ into @n@
 --
 --   * @Iso' key key'@, an isomorphism between @key@ and @key'@
 --
@@ -90,17 +95,19 @@ generateKey' = flip generateKey undefined
 -- @
 -- decrypt s' key' (encrypt s' key' p') == return p'.
 -- @
-trans :: Iso' key key'
+trans :: (n' -> n)
+      -- ^ map @n' -\> n@
+      -> Iso' key key'
       -- ^ bijection @key \<-\> key'@
       -> Prism' plaintext plaintext'
-      -- ^ embedding @plaintext' -\> plaintext@
+      -- ^ invertible embedding @plaintext' -\> plaintext@
       -> Prism' ciphertext' ciphertext
-      -- ^ embedding @ciphertext -\> ciphertext'@
-      -> PrivateKeyScheme key plaintext ciphertext
-      -> PrivateKeyScheme key' plaintext' ciphertext'
-trans kl pl cl s = PrivateKeyScheme
-  { generateKey = \n -> do
-      key <- generateKey s n
+      -- ^ invertible embedding @ciphertext -\> ciphertext'@
+      -> PrivateKeyScheme n key plaintext ciphertext
+      -> PrivateKeyScheme n' key' plaintext' ciphertext'
+trans nl kl pl cl s = PrivateKeyScheme
+  { generateKey = \n' -> do
+      key <- generateKey s (nl n')
       return $ key ^. kl
   , encrypt = \key' plaintext' -> do
       ciphertext <- encrypt s (key' ^. from kl) (plaintext' ^. re pl)
@@ -110,12 +117,23 @@ trans kl pl cl s = PrivateKeyScheme
       in fromJust $ plaintext ^? pl
   }
 
+-- | Compose two encryption schemes.
+compose :: ciphertext1 ~ plaintext2
+        => PrivateKeyScheme n1 key1 plaintext1 ciphertext1
+        -> PrivateKeyScheme n2 key2 plaintext2 ciphertext2
+        -> PrivateKeyScheme (n1, n2) (key1, key2) plaintext1 ciphertext2
+compose s1 s2 = PrivateKeyScheme
+  { generateKey = \(n1, n2) -> (,) <$> generateKey s1 n1 <*> generateKey s2 n2
+  , encrypt = \(key1, key2) -> encrypt s2 key2 <=< encrypt s1 key1
+  , decrypt = \(key1, key2) -> decrypt s1 key1 . decrypt s2 key2
+  }
+
 -- | Given a 'PrivateKeyScheme' that operates on individual characters, lift
 -- that scheme to one that operates on strings. The new scheme uses the same
 -- @key@ type as the per-character scheme, and encrypts/decrypts by mapping the
 -- input scheme's 'encrypt' and 'decrypt' functions over the strings.
-mono :: PrivateKeyScheme key plainchar cipherchar
-     -> PrivateKeyScheme key [plainchar] [cipherchar]
+mono :: PrivateKeyScheme n key plainchar cipherchar
+     -> PrivateKeyScheme n key [plainchar] [cipherchar]
 mono s = PrivateKeyScheme
   { generateKey = generateKey s
   , encrypt = traverse . encrypt s
@@ -128,21 +146,13 @@ mono s = PrivateKeyScheme
 -- @key@ to each character of plaintext. When we run out of keys, start over
 -- with the original list.
 --
--- The security parameter of the lifted scheme will determine the length of the
--- key produced by the 'generateKey' function. The 'Int' that is passed to this
--- function will be used as the security parameter that gets fed to the
--- 'generateKey' of the input scheme.
---
 -- If the key length is non-positive, the key generation will throw a runtime
 -- error.
-poly :: PrivateKeyScheme key plaintext ciphertext
-     -> Int
-     -- ^ The security parameter to pass to the input scheme's
-     -- key generator.
-     -> PrivateKeyScheme (LN.NonEmpty key) [plaintext] [ciphertext]
-poly s securityParam = PrivateKeyScheme
-  { generateKey = \keyLength -> do
-      ks <- replicateM keyLength (generateKey s securityParam)
+poly :: PrivateKeyScheme n key plaintext ciphertext
+     -> PrivateKeyScheme (Int, n) (LN.NonEmpty key) [plaintext] [ciphertext]
+poly s = PrivateKeyScheme
+  { generateKey = \(keyLength, n) -> do
+      ks <- replicateM keyLength (generateKey s n)
       case LN.nonEmpty ks of
         Just key -> return key
         Nothing -> error msg
@@ -155,7 +165,7 @@ poly s securityParam = PrivateKeyScheme
 -- | Shift cipher for single 'Alpha'. This is used to define
 -- 'monoAlphaShift' and 'polyAlphaShift'. The key generator ignores
 -- its input.
-alphaShift :: PrivateKeyScheme Int Alpha Alpha
+alphaShift :: PrivateKeyScheme () Int Alpha Alpha
 alphaShift = PrivateKeyScheme
   { generateKey = const $ uniform [0 .. 25]
   , encrypt = \key -> return . shiftAlpha key
@@ -168,7 +178,7 @@ alphaShift = PrivateKeyScheme
 -- @
 -- monoAlphaShift == mono alphaShift
 -- @
-monoAlphaShift :: PrivateKeyScheme Int [Alpha] [Alpha]
+monoAlphaShift :: PrivateKeyScheme () Int [Alpha] [Alpha]
 monoAlphaShift = mono alphaShift
 
 -- | Poly-alphabetic shift cipher, also known as Vigenère cipher. This promotes
@@ -177,13 +187,13 @@ monoAlphaShift = mono alphaShift
 -- @
 -- polyAlphaShift == poly alphaShift undefined
 -- @
-polyAlphaShift :: PrivateKeyScheme (LN.NonEmpty Int) [Alpha] [Alpha]
-polyAlphaShift = poly alphaShift undefined
+polyAlphaShift :: PrivateKeyScheme Int (LN.NonEmpty Int) [Alpha] [Alpha]
+polyAlphaShift = trans (,()) id id id $ poly alphaShift
 
 -- | Substitution cipher for single 'Alpha'. This is used to define
 -- 'monoAlphaSubst' and 'polyAlphaSubst'. The key generator ignores
 -- its input.
-alphaSubst :: PrivateKeyScheme Permutation Alpha Alpha
+alphaSubst :: PrivateKeyScheme () Permutation Alpha Alpha
 alphaSubst = PrivateKeyScheme
   { generateKey = const $ fst . randomPermutation 26 . mkStdGen <$> getRandom
   , encrypt = \key -> return . permuteAlpha key
@@ -197,7 +207,7 @@ alphaSubst = PrivateKeyScheme
 -- @
 -- monoAlphaSubst == mono alphaSubst
 -- @
-monoAlphaSubst :: PrivateKeyScheme Permutation [Alpha] [Alpha]
+monoAlphaSubst :: PrivateKeyScheme () Permutation [Alpha] [Alpha]
 monoAlphaSubst = mono alphaSubst
 
 -- | Poly-alphabetic substitution cipher. This promotes the normal
@@ -206,11 +216,11 @@ monoAlphaSubst = mono alphaSubst
 -- @
 -- polyAlphaSubst == poly alphaSubst undefined
 -- @
-polyAlphaSubst :: PrivateKeyScheme (LN.NonEmpty Permutation) [Alpha] [Alpha]
-polyAlphaSubst = poly alphaSubst undefined
+polyAlphaSubst :: PrivateKeyScheme Int (LN.NonEmpty Permutation) [Alpha] [Alpha]
+polyAlphaSubst = trans (,()) id id id $ poly alphaSubst
 
 -- | One-time pad on bitvectors of a given length.
-oneTimePad :: BV.NatRepr w -> PrivateKeyScheme (BV.BV w) (BV.BV w) (BV.BV w)
+oneTimePad :: BV.NatRepr w -> PrivateKeyScheme () (BV.BV w) (BV.BV w) (BV.BV w)
 oneTimePad w = PrivateKeyScheme
   { generateKey = const $ BV.mkBV w <$> getRandom
   , encrypt = \key -> return . BV.xor key
