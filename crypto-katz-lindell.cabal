@@ -32,7 +32,9 @@ library
     -- other-modules:
 
     -- LANGUAGE extensions used by modules in this package.
-    default-extensions:   ScopedTypeVariables
+    default-extensions:   GADTs
+                          RankNTypes
+                          ScopedTypeVariables
                           TupleSections
     build-depends:        base,
                           array,
