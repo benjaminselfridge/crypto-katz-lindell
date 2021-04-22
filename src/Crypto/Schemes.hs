@@ -215,7 +215,9 @@ data PrivateKeyScheme n key plaintext ciphertext = PrivateKeyScheme
 -- schemes that ignore the security parameter (like a basic shift or
 -- substitution cipher).
 generateKey' :: forall key plaintext ciphertext m . MonadRandom m
-             => PrivateKeyScheme () key plaintext ciphertext -> m key
+             => PrivateKeyScheme () key plaintext ciphertext
+             -- ^
+             -> m key
 generateKey' = flip generateKey ()
 
 -- | Generate a 'PrivateKeyScheme' from an existing scheme by supplying
@@ -268,24 +270,28 @@ trans nl kl pl cl s = PrivateKeyScheme
 
 -- | 'trans' but only for the security parameter @n@.
 transN :: (n' -> n)
-        -> PrivateKeyScheme n key plaintext ciphertext
-        -> PrivateKeyScheme n' key plaintext ciphertext
+       -- ^
+       -> PrivateKeyScheme n key plaintext ciphertext
+       -> PrivateKeyScheme n' key plaintext ciphertext
 transN f = trans f id id id
 
 -- | 'trans' but only for the @key@.
 transKey :: Iso' key key'
+         -- ^
          -> PrivateKeyScheme n key plaintext ciphertext
          -> PrivateKeyScheme n key' plaintext ciphertext
 transKey f = trans id f id id
 
 -- | 'trans' but only for the @plaintext@.
 transPlaintext :: Prism' plaintext plaintext'
+               -- ^
                -> PrivateKeyScheme n key plaintext ciphertext
                -> PrivateKeyScheme n key plaintext' ciphertext
 transPlaintext f = trans id id f id
 
 -- | 'trans' but only for the @ciphertext@.
 transCiphertext :: Prism' ciphertext' ciphertext
+                -- ^
                 -> PrivateKeyScheme n key plaintext ciphertext
                 -> PrivateKeyScheme n key plaintext ciphertext'
 transCiphertext = trans id id id
@@ -293,6 +299,7 @@ transCiphertext = trans id id id
 -- | Compose two encryption schemes.
 compose :: ciphertext1 ~ plaintext2
         => PrivateKeyScheme n1 key1 plaintext1 ciphertext1
+        -- ^
         -> PrivateKeyScheme n2 key2 plaintext2 ciphertext2
         -> PrivateKeyScheme (n1, n2) (key1, key2) plaintext1 ciphertext2
 compose s1 s2 = PrivateKeyScheme
@@ -306,6 +313,7 @@ compose s1 s2 = PrivateKeyScheme
 -- @key@ type as the per-character scheme, and encrypts/decrypts by mapping the
 -- input scheme's 'encrypt' and 'decrypt' functions over the strings.
 mono :: PrivateKeyScheme n key plainchar cipherchar
+     -- ^
      -> PrivateKeyScheme n key [plainchar] [cipherchar]
 mono s = PrivateKeyScheme
   { generateKey = generateKey s
@@ -322,6 +330,7 @@ mono s = PrivateKeyScheme
 -- If the key length is non-positive, the key generation will throw a runtime
 -- error.
 poly :: PrivateKeyScheme n key plaintext ciphertext
+     -- ^
      -> PrivateKeyScheme (Int, n) (LN.NonEmpty key) [plaintext] [ciphertext]
 poly s = PrivateKeyScheme
   { generateKey = \(keyLength, n) -> do
@@ -358,7 +367,7 @@ monoAlphaShift = mono alphaShift
 -- the normal 'alphaShift' to operate on lists of keys.
 --
 -- @
--- polyAlphaShift == poly alphaShift undefined
+-- polyAlphaShift == transN (,()) $ poly alphaShift
 -- @
 polyAlphaShift :: PrivateKeyScheme Int (LN.NonEmpty Int) [Alpha] [Alpha]
 polyAlphaShift = transN (,()) $ poly alphaShift
@@ -387,7 +396,7 @@ monoAlphaSubst = mono alphaSubst
 -- 'alphaSubst' to operate on lists of keys.
 --
 -- @
--- polyAlphaSubst == poly alphaSubst undefined
+-- polyAlphaSubst == transN (,()) $ poly alphaSubst
 -- @
 polyAlphaSubst :: PrivateKeyScheme Int (LN.NonEmpty Permutation) [Alpha] [Alpha]
 polyAlphaSubst = transN (,()) $ poly alphaSubst
