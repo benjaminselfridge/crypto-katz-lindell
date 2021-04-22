@@ -1,7 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeOperators #-}
 
 -- | Types for, and examples of, encryption schemes found in Katz/Lindell.
@@ -14,7 +13,7 @@ module Crypto.Schemes
   , PrivateKeyScheme(..)
   , generateKey'
     -- ** New schemes from old
-  , trans
+  , trans, transN, transKey, transPlaintext, transCiphertext
   , compose
   , mono
   , poly
@@ -78,7 +77,7 @@ generateKey' = flip generateKey ()
 --
 -- Note the argument types:
 --
---   * @Prism' n n'@, a reversible injective embedding of @n'@ into @n@
+--   * @n' -> n@, any map from security parameter @n'@ to @n@
 --
 --   * @Iso' key key'@, an isomorphism between @key@ and @key'@
 --
@@ -116,6 +115,30 @@ trans nl kl pl cl s = PrivateKeyScheme
       let plaintext = decrypt s (key' ^. from kl) (fromJust $ ciphertext' ^? cl)
       in fromJust $ plaintext ^? pl
   }
+
+-- | 'trans' but only for the security parameter @n@.
+transN :: (n' -> n)
+        -> PrivateKeyScheme n key plaintext ciphertext
+        -> PrivateKeyScheme n' key plaintext ciphertext
+transN f = trans f id id id
+
+-- | 'trans' but only for the @key@.
+transKey :: Iso' key key'
+         -> PrivateKeyScheme n key plaintext ciphertext
+         -> PrivateKeyScheme n key' plaintext ciphertext
+transKey f = trans id f id id
+
+-- | 'trans' but only for the @plaintext@.
+transPlaintext :: Prism' plaintext plaintext'
+               -> PrivateKeyScheme n key plaintext ciphertext
+               -> PrivateKeyScheme n key plaintext' ciphertext
+transPlaintext f = trans id id f id
+
+-- | 'trans' but only for the @ciphertext@.
+transCiphertext :: Prism' ciphertext' ciphertext
+                -> PrivateKeyScheme n key plaintext ciphertext
+                -> PrivateKeyScheme n key plaintext ciphertext'
+transCiphertext f = trans id id id f
 
 -- | Compose two encryption schemes.
 compose :: ciphertext1 ~ plaintext2
@@ -188,7 +211,7 @@ monoAlphaShift = mono alphaShift
 -- polyAlphaShift == poly alphaShift undefined
 -- @
 polyAlphaShift :: PrivateKeyScheme Int (LN.NonEmpty Int) [Alpha] [Alpha]
-polyAlphaShift = trans (,()) id id id $ poly alphaShift
+polyAlphaShift = transN (,()) $ poly alphaShift
 
 -- | Substitution cipher for single 'Alpha'. This is used to define
 -- 'monoAlphaSubst' and 'polyAlphaSubst'. The key generator ignores
@@ -217,7 +240,7 @@ monoAlphaSubst = mono alphaSubst
 -- polyAlphaSubst == poly alphaSubst undefined
 -- @
 polyAlphaSubst :: PrivateKeyScheme Int (LN.NonEmpty Permutation) [Alpha] [Alpha]
-polyAlphaSubst = trans (,()) id id id $ poly alphaSubst
+polyAlphaSubst = transN (,()) $ poly alphaSubst
 
 -- | One-time pad on bitvectors of a given length.
 oneTimePad :: BV.NatRepr w -> PrivateKeyScheme () (BV.BV w) (BV.BV w) (BV.BV w)

@@ -32,7 +32,7 @@ instance KnownNat w => Arbitrary (ABV w) where
     choose (0, maxUnsigned (knownNat :: NatRepr w))
 
 prop_encryptDecrypt :: Eq plaintext
-                    => PrivateKeyScheme key plaintext ciphertext
+                    => PrivateKeyScheme Int key plaintext ciphertext
                     -> KeyLength
                     -> plaintext
                     -> Property
@@ -42,10 +42,13 @@ prop_encryptDecrypt s (KeyLength n) plaintext = monadicIO $ do
   assert $ decrypt s key ciphertext == plaintext
 
 prop_encryptDecrypt' :: Eq plaintext
-                     => PrivateKeyScheme key plaintext ciphertext
+                     => PrivateKeyScheme () key plaintext ciphertext
                      -> plaintext
                      -> Property
-prop_encryptDecrypt' = flip prop_encryptDecrypt (KeyLength undefined)
+prop_encryptDecrypt' s plaintext = monadicIO $ do
+  key <- run $ generateKey s ()
+  ciphertext <- run $ encrypt s key plaintext
+  assert $ decrypt s key ciphertext == plaintext
 
 tests :: TestTree
 tests = testGroup "Encrypt/Decrypt"
@@ -58,8 +61,8 @@ tests = testGroup "Encrypt/Decrypt"
   , testProperty "poly-alphabetic substitution" $
     prop_encryptDecrypt polyAlphaSubst
   , testProperty "one-time pad" $
-    prop_encryptDecrypt $
-    trans id (prism' unABV (Just . ABV)) id (oneTimePad (knownNat @32))
+    prop_encryptDecrypt' $
+    transPlaintext (prism' unABV (Just . ABV)) $ oneTimePad (knownNat @32)
   ]
 
 main :: IO ()
