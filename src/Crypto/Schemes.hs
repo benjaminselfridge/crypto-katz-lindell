@@ -3,7 +3,155 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
 
--- | Types for, and examples of, encryption schemes found in Katz/Lindell.
+{-|
+
+Module: Crypto.Schemes
+Description: Private key encryption schemes
+Copyright: (c) Ben Selfridge, 2021
+
+This module contains the types and combinators for defining and using
+private-key encryption schemes. The basic type exported by this module is
+
+@
+data PrivateKeyScheme n k p c
+@
+
+where @k@ is the scheme's key type, @p@ is the plaintext type, @c@ is the
+ciphertext type, and @n@ is the /security parameter/ that is input to the key
+generation function.
+
+Let's look at an example of how to use this module in a ghci session. First
+we'll include some necessary imports and extensions for the example.
+
+>>> :set -XOverloadedStrings -XTupleSections -XDataKinds -XTypeApplications
+>>> import qualified Data.BitVector.Sized as BV
+>>> import Data.ByteString.Internal (c2w, w2c)
+>>> import qualified Data.ByteString.Lazy as BS
+>>> import qualified Data.List.NonEmpty as LN
+>>> import Data.Word
+>>> import Control.Lens
+>>> import Math.Combinat.Permutations
+>>> import Crypto.Schemes
+
+Consider the type of 'oneTimePad', exported by this module:
+
+>>> :t oneTimePad
+oneTimePad
+  :: BV.NatRepr w
+     -> PrivateKeyScheme () (BV.BV w) (BV.BV w) (BV.BV w)
+
+This takes a width parameter, @w@, and generates an encryption scheme with key
+type, plaintext type, and ciphertext type @BV w@. Note that it has no security
+parameter; @oneTimePad@ does not need any extra information to know how to
+generate a key. Let's specialize @oneTimePad@ to operate on bytes:
+
+>>> otp8 = oneTimePad (BV.knownNat @8)
+>>> :t otp8
+otp8 :: PrivateKeyScheme () (BV.BV 8) (BV.BV 8) (BV.BV 8)
+
+We can use it to generate a key, and to encrypt and decrypt a message with that
+key:
+
+>>> k <- generateKey otp8
+>>> msg = BV.mkBV (BV.knownNat @8) 123
+>>> msg' <- encrypt otp8 k msg
+>>> msg'
+BV 203
+>>> decrypt otp8 k msg
+BV 123
+
+This is a bit limiting. What if we want to dynamically set the key length, and
+operate on bytestrings instead of bitvectors? We can actually derive such a
+scheme from this basic one through a series of transformations. That is, we will
+go from
+
+@
+otp8 :: PrivateKeyScheme () (BV.BV 8) (BV.BV 8) (BV.BV 8)
+@
+
+to
+
+@
+otpBS :: PrivateKeyScheme Int BS.ByteString BS.ByteString BS.ByteString
+@
+
+(The @Int@ in the second type signature is the key length.)
+
+The first step in this transformation is to change all the @BV@s to words. We
+will do this with the help of the 'trans' function, as well as a simple
+'Control.Lens' isomorphism:
+
+>>> bvW8 = iso (fromInteger . BV.asUnsigned) BV.word8 :: Iso' (BV.BV 8) Word8
+>>> otpW8 = trans id bvW8 bvW8 (from bvW8) otp8
+>>> :t otpW8
+otpW8 :: PrivateKeyScheme () Word8 Word8 Word8
+
+Next, we will use the 'poly' combinator to lift @otpW8@ to operate on lists of
+'Data.Word.Word8's, so that the key becomes a list as well, and we cycle through
+the key to perform encryption on each 'Data.Word.Word8':
+
+>>> otpW8s = transN (,()) $ poly otpW8
+otpW8s
+  :: PrivateKeyScheme Int (LN.NonEmpty Word8) [Word8] [Word8]
+
+(The use of @transN (,())@ just gets rid of an unnecessary @()@ in the security
+parameter type.)
+
+Now, the key type requires the key to be nonempty. This is reasonable, since we
+need to have /some/ key to use with the original encryption scheme. However,
+that makes things a bit annoying for us, since ByteStrings can be empty. We will
+solve this problem by cheating. First, we define an "isomorphism" between
+@NonEmpty Word8@ and @[Word8]@, and then we use it to change the key type:
+
+>>> ne = iso LN.toList LN.fromList :: Iso' (LN.NonEmpty Word8) [Word8]
+>>> otpW8s' = transKey ne otpW8s
+>>> :t otpW8s'
+otpW8s' :: PrivateKeyScheme Int [Word8] [Word8] [Word8]
+
+We are almost there. We just need one more isomorphism, mapping @[Word8]@ to
+'Data.ByteString.Lazy.ByteString':
+
+>>> w8BS = iso BS.pack BS.unpack :: Iso' [Word8] BS.ByteString
+>>> otpBS = trans id w8BS w8BS (from w8BS) otpW8s'
+otpBS
+  :: PrivateKeyScheme Int BS.ByteString BS.ByteString BS.ByteString
+
+Now, our original encryption scheme (which only operated on fixed-width
+bitvectors) has been generalized to work on bytestrings as well, and we can
+generate a key of any length we want:
+
+>>> k <- generateKey otpBS 128
+>>> k
+"#2\156\128\248\DC1U)n\166\198\162\&2A\212\n&\NULb1\132!\155?5\255j\182\ETB\219\187\205\224~n\212\172\212\ETB\137\235\228P\220q\192\a\209\226\234\208\\\165j\172\177\\oD\154\141\254W\ETB?\138\141\"\246\162\rS7Y\ACK\DC3\150\210\196\172?\ESC\175R\ETBk\154\SII\143\149\176R.\132;\148C\161\182\192\248\249`\160\165\\\ETB\229\&9\231\172k4\141\211\242\161\146\164\213\203*5\247\143\232B"
+>>> msg = "This message is fewer than 128 characters, so if this is the only message I send, it will be perfectly secret!" :: BS.ByteString
+>>> msg' <- encrypt otpBS k msg
+>>> msg'
+"wZ\245\243\216|0Z\GS\199\161\199\DC2(\167*@e\NAKT\246\SOH\239WT\145J\135%\227\155\174\136\US\FS\181\207\160r\251\152\200p\175\RS\224n\183\194\158\184\&5\214J\197\194|\ESC,\255\173\145\&9{F\170\224G\133\209l4RyO3\229\183\170\200\DC3;\198&7\FS\243c%\175\247\213r^\225I\242&\194\194\172\129\217\DC3\197\198.r\145\CAN"
+>>> decrypt otpBS k msg'
+"This message is fewer than 128 characters, so if this is the only message I send, it will be perfectly secret!"
+
+We can also /compose/ two schemes. The following two schemes are exported by
+this module:
+
+@
+polyAlphaShift :: PrivateKeyScheme Int (LN.NonEmpty Int) [Alpha] [Alpha]
+monoAlphaSubst :: PrivateKeyScheme () Permutation [Alpha] [Alpha]
+@
+
+It would be nice if we could compose the two schemes to obtain the benefits of
+both. Fortunately, we can:
+
+>>> cipher = transN (,()) $ compose polyAlphaShift monoAlphaSubst
+>>> :t cipher
+cipher
+  :: PrivateKeyScheme
+       Int (LN.NonEmpty Int, Permutation) [Alpha] [Alpha]
+
+The resulting @encrypt@ function first performs a poly-alphabetic shift to the
+plaintext, followed by a mono-alphabetic substitution. The combined scheme uses
+a pair of keys, each used for a separate encryption step.
+
+-}
 module Crypto.Schemes
   ( -- * Encryption and decryption
     EncryptFn
