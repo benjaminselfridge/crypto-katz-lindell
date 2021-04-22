@@ -1,18 +1,14 @@
 cabal-version:      2.4
 name:               crypto-katz-lindell
 version:            0.1.0.0
+synopsis:           a data type for encryption schemes
 
--- A short (one-line) description of the package.
--- synopsis:
-
--- A longer description of the package.
--- description:
 
 -- A URL where users can report bugs.
 -- bug-reports:
 
 -- The license under which the package is released.
--- license:
+license:            BSD-3
 author:             Ben Selfridge
 maintainer:         benselfridge@galois.com
 
