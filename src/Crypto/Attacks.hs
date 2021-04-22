@@ -121,7 +121,7 @@ breakMonoAlphaShiftEnglish :: CiphertextOnlyAttack Int [Alpha] [Alpha]
 breakMonoAlphaShiftEnglish = bruteForceEnglish [0..25] monoAlphaShift
 
 -- | English-biased ciphertext-only attack on 'polyAlphaShift', given the
--- key length of the cipher. Use in conjunciton with 'guessPolyAlphaKeyLength'.
+-- key length of the cipher. Use in conjunction with 'guessPolyAlphaKeyLength'.
 breakPolyAlphaShiftEnglish :: Int -> CiphertextOnlyAttack (LN.NonEmpty Int) [Alpha] [Alpha]
 breakPolyAlphaShiftEnglish = breakPoly breakMonoAlphaShiftEnglish
 

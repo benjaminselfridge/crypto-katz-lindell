@@ -25,7 +25,6 @@ we'll include some necessary imports and extensions for the example.
 
 >>> :set -XOverloadedStrings -XTupleSections -XDataKinds -XTypeApplications
 >>> import qualified Data.BitVector.Sized as BV
->>> import Data.ByteString.Internal (c2w, w2c)
 >>> import qualified Data.ByteString.Lazy as BS
 >>> import qualified Data.List.NonEmpty as LN
 >>> import Data.Word
@@ -208,7 +207,7 @@ type DecryptFn plaintext ciphertext = ciphertext -> plaintext
 -- @
 data PrivateKeyScheme n key plaintext ciphertext = PrivateKeyScheme
   { generateKey :: forall m . MonadRandom m => n -> m key
-    -- ^ Generate a random key from a given security parameter ('Int').
+    -- ^ Generate a random key from a given security parameter of type @n@.
   , encrypt :: key -> EncryptFn plaintext ciphertext
     -- ^ Encrypt plaintext with a given key.
   , decrypt :: key -> DecryptFn plaintext ciphertext
