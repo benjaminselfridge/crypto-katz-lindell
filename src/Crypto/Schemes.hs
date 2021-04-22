@@ -51,7 +51,7 @@ type DecryptFn plaintext ciphertext = ciphertext -> plaintext
 -- messages @p@:
 --
 -- @
---   decrypt s k (encrypt s k m) == m
+--   decrypt s k (encrypt s k p) == return p
 -- @
 data PrivateKeyScheme key plaintext ciphertext = PrivateKeyScheme
   { generateKey :: forall m . MonadRandom m => Int -> m key
@@ -71,17 +71,31 @@ generateKey' = flip generateKey undefined
 
 -- | Generate a 'PrivateKeyScheme' from an existing scheme by supplying
 -- bidirectional mappings between the @key@, @plaintext@, and @ciphertext@
--- types. bijections between the key, plaintext, and ciphertext types.
+-- types.
 --
 -- Note the argument types:
--- * @Iso' key key'@, an isomorphism between @key@ and @key'@
--- * @Prism' plaintext plaintext'@, a reversible injective embedding of
---   @plaintext'@ into @plaintext@
--- * @Prism' ciphertext' ciphertext@, a reversible injective embedding of
---   @ciphertext@ into @ciphertext'
+--
+--   * @Iso' key key'@, an isomorphism between @key@ and @key'@
+--
+--   * @Prism' plaintext plaintext'@, a reversible injective embedding of
+--     @plaintext'@ into @plaintext@
+--
+--   * @Prism' ciphertext' ciphertext@, a reversible injective embedding of
+--     @ciphertext@ into @ciphertext'@
+--
+-- The need for these mappings is derived from the requirement that the derived
+-- scheme must be a correct encryption scheme, i.e. we must know that for all
+-- @p' :: plaintext'@ and @k' :: key'@,
+--
+-- @
+-- decrypt s' key' (encrypt s' key' p') == return p'.
+-- @
 iso :: Iso' key key'
+    -- ^ bijection @key \<-\> key'@
     -> Prism' plaintext plaintext'
+    -- ^ embedding @plaintext' -\> plaintext@
     -> Prism' ciphertext' ciphertext
+    -- ^ embedding @ciphertext -\> ciphertext'@
     -> PrivateKeyScheme key plaintext ciphertext
     -> PrivateKeyScheme key' plaintext' ciphertext'
 iso kl pl cl s = PrivateKeyScheme
