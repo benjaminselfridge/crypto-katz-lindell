@@ -81,7 +81,7 @@ type Distribution a b = Map.Map a b
 
 -- | Create a simple 'Distribution' by counting occurrences.
 getDist :: Ord a => [a] -> Distribution a Integer
-getDist as = foldr (flip (Map.insertWith (+)) 1) Map.empty as
+getDist = foldr (flip (Map.insertWith (+)) 1) Map.empty
 
 -- | A normalized 'Distribution', where the values are normalized to 'Float's
 -- that add up to @1@.

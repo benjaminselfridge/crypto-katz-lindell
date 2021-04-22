@@ -29,12 +29,11 @@ module Crypto.Schemes
 
 import Crypto.Types
 
-import Control.Lens (Iso', Prism', from, (^.), re, (^?))
+import Control.Lens (Iso', Prism', from, (^.), re, (^?!))
 import Control.Monad.Random
 import qualified Data.BitVector.Sized as BV
 import Data.Foldable (toList)
 import qualified Data.List.NonEmpty as LN
-import Data.Maybe (fromJust)
 import Math.Combinat.Permutations
 
 -- | Encryption function mapping @plaintext@ to @ciphertext@. Note that
@@ -112,8 +111,8 @@ trans nl kl pl cl s = PrivateKeyScheme
       ciphertext <- encrypt s (key' ^. from kl) (plaintext' ^. re pl)
       return $ ciphertext ^. re cl
   , decrypt = \key' ciphertext' ->
-      let plaintext = decrypt s (key' ^. from kl) (fromJust $ ciphertext' ^? cl)
-      in fromJust $ plaintext ^? pl
+      let plaintext = decrypt s (key' ^. from kl) (ciphertext' ^?! cl)
+      in plaintext ^?! pl
   }
 
 -- | 'trans' but only for the security parameter @n@.
@@ -138,7 +137,7 @@ transPlaintext f = trans id id f id
 transCiphertext :: Prism' ciphertext' ciphertext
                 -> PrivateKeyScheme n key plaintext ciphertext
                 -> PrivateKeyScheme n key plaintext ciphertext'
-transCiphertext f = trans id id id f
+transCiphertext = trans id id id
 
 -- | Compose two encryption schemes.
 compose :: ciphertext1 ~ plaintext2

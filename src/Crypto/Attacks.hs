@@ -72,7 +72,7 @@ bruteForceWithDist :: Ord plainchar
                    -> CiphertextOnlyAttack key [plainchar] ciphertext
 bruteForceWithDist refDist s keys ciphertext =
   let pairs = bruteForce s keys ciphertext
-  in sortBy (comparing (d' refDist . getNDist . snd)) pairs
+  in sortOn (d' refDist . getNDist . snd) pairs
 
 -- | A brute-force attack where @plaintext ~ [Alpha]@, sorted by closeness to
 -- English's letter distribution.
