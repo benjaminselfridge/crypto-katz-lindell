@@ -1,3 +1,15 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
+
 -- | Helper functions.
 module Crypto.Utils
   ( slices
@@ -18,15 +30,101 @@ module Crypto.Utils
   , NgramCount
   , ngrams
   , ngramsFromFile
+  -- * Choice (generalization of 'Either')
+  , Choice(..)
+  , choice
+  , choose
+  , isChoice
+  , fromChoice
+  , partitionChoices
+  , ChoiceList(..)
+  , Val(..)
   ) where
 
 import Crypto.Types
 
+import qualified Data.Kind as K
 import Data.List (transpose, permutations, nub, tails)
 import Data.List.Split (chunksOf, splitOn)
 import qualified Data.Map as Map
 import Data.Maybe (mapMaybe)
+import qualified Data.Parameterized.List as PL
+import Data.Parameterized.Classes
+import Data.Parameterized.TraversableFC
+import Data.Proxy
 import Math.Combinat.Compositions
+
+-- | Generalization of 'Either' for an arbitrary list of types.
+data Choice (f :: k -> K.Type) (tps :: [k]) where
+  Choice :: PL.Index tps tp -> f tp -> Choice f tps
+
+instance FunctorFC Choice where
+  fmapFC f (Choice i a) = Choice i (f a)
+
+instance FoldableFC Choice where
+  foldrFC f b (Choice _ a) = f a b
+
+instance TraversableFC Choice where
+  traverseFC f (Choice i a) = Choice i <$> f a
+
+deriving instance (forall tp . Show (f tp)) => Show (Choice f tps)
+instance (forall tp . Show (f tp)) => ShowF (Choice f)
+
+-- | Case analysis for the 'Choice' type. Analogous to 'either'.
+choice :: (forall tp . f tp -> c) -> Choice f tps -> c
+choice f (Choice _ a) = f a
+
+-- | Extracts from a list of 'Choice' all the elements of a particular index.
+-- All such elements are extracted in order. Analogous to 'Data.Either.lefts'
+-- and 'Data.Either.rights'.
+choose :: PL.Index tps tp -> [Choice f tps] -> [f tp]
+choose _ [] = []
+choose ix (Choice ix' a : cs)
+  | Just Refl <- ix `testEquality` ix' = a : choose ix cs
+  | otherwise = choose ix cs
+
+-- | Returns 'True' if the given value is an element of a particular choice
+-- index, 'False' otherwise. Analogous to 'Data.Either.isLeft' and
+-- 'Data.Either.isRight'.
+isChoice :: PL.Index tps tp -> Choice f tps -> Bool
+isChoice ix (Choice ix' _)
+  | Just Refl <- ix `testEquality` ix' = True
+  | otherwise = False
+
+-- | Return the contents of a 'Choice' if its index matches, or a default value
+-- otherwise. Analogous to 'Data.Either.fromLeft' and 'Data.Either.fromRight'.
+fromChoice :: PL.Index tps tp -> f tp -> Choice f tps -> f tp
+fromChoice ix a (Choice ix' b)
+  | Just Refl <- ix `testEquality` ix' = b
+  | otherwise = a
+
+instance KnownRepr Proxy ctx where
+  knownRepr = Proxy
+
+-- | Type for the result of 'partitionChoices'.
+data ChoiceList f tp = ChoiceList [f tp]
+
+deriving instance Show (f tp) => Show (ChoiceList f tp)
+
+instance (forall tp . Show (f tp)) => ShowF (ChoiceList f)
+
+-- | Partition a list of 'Choice' into @n@ lists, where @n@ is the number of
+-- different types in @tps@.
+partitionChoices :: forall f tps . KnownRepr (PL.List Proxy) tps
+                 => [Choice f tps]
+                 -> PL.List (ChoiceList f) tps
+partitionChoices [] = PL.imap (\_ _ -> ChoiceList []) proxies
+  where proxies :: PL.List Proxy tps
+        proxies = knownRepr
+partitionChoices (Choice i a : cs) =
+  let pRest = partitionChoices cs
+  in PL.update pRest i (\(ChoiceList as) -> ChoiceList (a:as))
+
+data Val (tp :: K.Type) where
+  AlphaVal :: Alpha -> Val Alpha
+  IntVal   :: Int   -> Val Int
+
+deriving instance Show (Val tp)
 
 -- | 'slices' splits a list into @n@ pieces. The pieces are constructed by
 -- taking every @n+k@th element of the list, where @k@ ranges from @0@ to @n-1@.
