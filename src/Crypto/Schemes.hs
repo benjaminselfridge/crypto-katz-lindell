@@ -166,6 +166,7 @@ module Crypto.Schemes
   , compose
   , mono
   , poly
+  , option
     -- ** Example private key ciphers
   , alphaShift
   , monoAlphaShift
@@ -391,6 +392,21 @@ poly s = PrivateKeyScheme
   }
 
   where msg = "generateKey called with non-positive key length"
+
+-- | Combine two encryption schemes that operate on the same plaintext by
+-- randomly picking one of them using a 50/50 probability for each.
+option :: PrivateKeyScheme n key  plaintext ciphertext
+       -> PrivateKeyScheme n' key' plaintext ciphertext'
+       -> PrivateKeyScheme (n, n') (key, key') plaintext (Either ciphertext ciphertext')
+option s s' = PrivateKeyScheme
+  { generateKey = \(n, n') -> (,) <$> generateKey s n <*> generateKey s' n'
+  , encrypt = \(k, k') p -> getRandom >>= \case
+      True  -> Left  <$> encrypt s  k  p
+      False -> Right <$> encrypt s' k' p
+  , decrypt = \(k, k') -> \case
+      Left  c  -> decrypt s  k  c
+      Right c' -> decrypt s' k' c'
+  }
 
 -- | Shift cipher for single 'Alpha'. This is used to define
 -- 'monoAlphaShift' and 'polyAlphaShift'. The key generator ignores

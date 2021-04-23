@@ -29,6 +29,7 @@ library
 
     -- LANGUAGE extensions used by modules in this package.
     default-extensions:   GADTs
+                          LambdaCase
                           RankNTypes
                           ScopedTypeVariables
                           TupleSections
@@ -40,6 +41,7 @@ library
                           containers,
                           lens,
                           MonadRandom,
+                          parameterized-utils,
                           QuickCheck,
                           split
     hs-source-dirs:   src
