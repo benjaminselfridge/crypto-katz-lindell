@@ -190,12 +190,12 @@ import Math.Combinat.Permutations
 
 -- | Encryption function mapping @plaintext@ to @ciphertext@. Note that
 -- encryption can be probabilistic (but doesn't have to be).
-type EncryptFn plaintext ciphertext =
-  forall m . MonadRandom m => plaintext -> m ciphertext
+type EncryptFn key plaintext ciphertext =
+  forall m . MonadRandom m => key -> plaintext -> m ciphertext
 
 -- | Decryption function mapping @ciphertext@ to @plaintext@. Note that
 -- decryption is deterministic.
-type DecryptFn plaintext ciphertext = ciphertext -> plaintext
+type DecryptFn key plaintext ciphertext = key -> ciphertext -> plaintext
 
 -- | Private key scheme, as defined in Katz/Lindell page 60 (Definition 3.7),
 -- but with generalized keys, plaintext, and ciphertext types.
@@ -209,9 +209,10 @@ type DecryptFn plaintext ciphertext = ciphertext -> plaintext
 data PrivateKeyScheme n key plaintext ciphertext = PrivateKeyScheme
   { generateKey :: forall m . MonadRandom m => n -> m key
     -- ^ Generate a random key from a given security parameter of type @n@.
-  , encrypt :: key -> EncryptFn plaintext ciphertext
+  -- , encrypt :: key -> EncryptFn plaintext ciphertext
+  , encrypt :: EncryptFn key plaintext ciphertext
     -- ^ Encrypt plaintext with a given key.
-  , decrypt :: key -> DecryptFn plaintext ciphertext
+  , decrypt :: DecryptFn key plaintext ciphertext
     -- ^ Decrypt plaintext with a given key.
   }
 
@@ -366,7 +367,7 @@ mono :: PrivateKeyScheme n key plainchar cipherchar
      -> PrivateKeyScheme n key [plainchar] [cipherchar]
 mono s = PrivateKeyScheme
   { generateKey = generateKey s
-  , encrypt = \k -> traverse $ encrypt s k
+  , encrypt = traverse . encrypt s
   , decrypt = map . decrypt s
   }
 
@@ -387,7 +388,7 @@ poly s = PrivateKeyScheme
       case LN.nonEmpty ks of
         Just key -> return key
         Nothing -> error msg
-  , encrypt = \k -> zipWithM (\k' p' -> encrypt s k' p') (cycle $ toList k)
+  , encrypt = \k -> zipWithM (encrypt s) (cycle $ toList k)
   , decrypt = zipWith (decrypt s) . cycle . toList
   }
 
