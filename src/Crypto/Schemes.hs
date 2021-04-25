@@ -395,14 +395,17 @@ poly s = PrivateKeyScheme
 
 -- | Combine two encryption schemes that operate on the same plaintext by
 -- randomly picking one of them using a 50/50 probability for each.
-option :: PrivateKeyScheme n key  plaintext ciphertext
+option :: (Word, Word)
+       -- ^ Rational number represented as a @(part, whole)@ pair. This is the
+       -- probability that we return a 'Left'.
+       -> PrivateKeyScheme n key  plaintext ciphertext
        -> PrivateKeyScheme n' key' plaintext ciphertext'
        -> PrivateKeyScheme (n, n') (key, key') plaintext (Either ciphertext ciphertext')
-option s s' = PrivateKeyScheme
+option (a, b) s s' = PrivateKeyScheme
   { generateKey = \(n, n') -> (,) <$> generateKey s n <*> generateKey s' n'
-  , encrypt = \(k, k') p -> getRandom >>= \case
-      True  -> Left  <$> encrypt s  k  p
-      False -> Right <$> encrypt s' k' p
+  , encrypt = \(k, k') p -> getRandomR (1, b) >>= \case
+      a' | a' <= a   -> Left  <$> encrypt s  k  p
+         | otherwise -> Right <$> encrypt s' k' p
   , decrypt = \(k, k') -> \case
       Left  c  -> decrypt s  k  c
       Right c' -> decrypt s' k' c'
