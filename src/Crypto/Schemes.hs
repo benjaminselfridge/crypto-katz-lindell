@@ -222,7 +222,7 @@ generateKey' :: forall key plaintext ciphertext m . MonadRandom m
              => PrivateKeyScheme () key plaintext ciphertext
              -- ^
              -> m key
-generateKey' = flip generateKey ()
+generateKey' s = generateKey s ()
 
 -- | Build a simple shift cipher given a way to apply a shift int to the text.
 shiftFromAction :: Int
@@ -261,7 +261,7 @@ substFromAction :: Int
 substFromAction n apply = PrivateKeyScheme
   { generateKey = const $ fst . randomPermutation n . mkStdGen <$> getRandom
   , encrypt = \key -> return . apply key
-  , decrypt = \key -> apply (inverse key)
+  , decrypt = \key -> apply (inversePermutation key)
   }
 
 -- | Build a simple substitution cipher given the universe of text. Encrypting
@@ -366,7 +366,7 @@ mono :: PrivateKeyScheme n key plainchar cipherchar
      -> PrivateKeyScheme n key [plainchar] [cipherchar]
 mono s = PrivateKeyScheme
   { generateKey = generateKey s
-  , encrypt = traverse . encrypt s
+  , encrypt = \k -> traverse $ encrypt s k
   , decrypt = map . decrypt s
   }
 
@@ -387,7 +387,7 @@ poly s = PrivateKeyScheme
       case LN.nonEmpty ks of
         Just key -> return key
         Nothing -> error msg
-  , encrypt = zipWithM (encrypt s) . cycle . toList
+  , encrypt = \k -> zipWithM (\k' p' -> encrypt s k' p') (cycle $ toList k)
   , decrypt = zipWith (decrypt s) . cycle . toList
   }
 

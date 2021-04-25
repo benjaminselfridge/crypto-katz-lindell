@@ -38,7 +38,6 @@ module Crypto.Utils
   , fromChoice
   , partitionChoices
   , ChoiceList(..)
-  , Val(..)
   ) where
 
 import Crypto.Types
@@ -102,10 +101,9 @@ instance KnownRepr Proxy ctx where
   knownRepr = Proxy
 
 -- | Type for the result of 'partitionChoices'.
-data ChoiceList f tp = ChoiceList [f tp]
+data ChoiceList f tp = ChoiceList { unChoiceList :: [f tp] }
 
 deriving instance Show (f tp) => Show (ChoiceList f tp)
-
 instance (forall tp . Show (f tp)) => ShowF (ChoiceList f)
 
 -- | Partition a list of 'Choice' into @n@ lists, where @n@ is the number of
@@ -119,12 +117,6 @@ partitionChoices [] = PL.imap (\_ _ -> ChoiceList []) proxies
 partitionChoices (Choice i a : cs) =
   let pRest = partitionChoices cs
   in PL.update pRest i (\(ChoiceList as) -> ChoiceList (a:as))
-
-data Val (tp :: K.Type) where
-  AlphaVal :: Alpha -> Val Alpha
-  IntVal   :: Int   -> Val Int
-
-deriving instance Show (Val tp)
 
 -- | 'slices' splits a list into @n@ pieces. The pieces are constructed by
 -- taking every @n+k@th element of the list, where @k@ ranges from @0@ to @n-1@.

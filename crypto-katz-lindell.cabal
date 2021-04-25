@@ -37,7 +37,7 @@ library
                           array,
                           bv-sized,
                           bytestring,
-                          combinat,
+                          combinat >= 0.2.10 && < 0.3,
                           containers,
                           lens,
                           MonadRandom,

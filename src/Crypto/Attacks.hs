@@ -6,8 +6,6 @@ module Crypto.Attacks
   ( -- * Types of attacks
     CiphertextOnlyAttack
   , KnownPlaintextAttack
-  , ChosenPlaintextAttack
-  , ChosenCiphertextAttack
     -- * General attacks
   , bruteForce
   , bruteForceWithDist
@@ -42,16 +40,6 @@ type CiphertextOnlyAttack key plaintext ciphertext = ciphertext -> [(key, plaint
 -- ciphertext encrypted by that key. (Katz/Lindell pg. 8)
 type KnownPlaintextAttack key plaintext ciphertext =
   [(plaintext, ciphertext)] -> CiphertextOnlyAttack key plaintext ciphertext
-
--- | A chosen-plaintext attack is an attack where the encryption function can be
--- called arbitrarily, and the key remains fixed. (Katz/Lindell pg. 8)
-type ChosenPlaintextAttack key plaintext ciphertext =
-  EncryptFn plaintext ciphertext -> CiphertextOnlyAttack key plaintext ciphertext
-
--- | A chosen-ciphertext attack is an attack where the decryption function can
--- be called arbitrarily, and the key remains fixed. (Katz/Lindell pg. 8)
-type ChosenCiphertextAttack key plaintext ciphertext =
-  DecryptFn plaintext ciphertext -> CiphertextOnlyAttack key plaintext ciphertext
 
 -- | A brute-force attack can be applied on any encryption scheme. Given a
 -- ciphertext to decrypt, the scheme @s@ it was encrypted with, and a list of
